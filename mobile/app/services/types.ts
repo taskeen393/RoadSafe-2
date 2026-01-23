@@ -41,6 +41,7 @@ export interface ReportRequest {
 export interface ReportResponse {
     _id: string;
     user: string;
+    userId?: string;
     location: string;
     lat?: number;
     lon?: number;

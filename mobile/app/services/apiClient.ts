@@ -33,7 +33,7 @@ export const LOCATIONIQ_KEY = 'pk.373eb4eed9c850538051f7b1c58f4457';
 // Create axios instance for backend API
 const apiClient = axios.create({
     baseURL: API_BASE_URL,
-    timeout: 15000,
+    timeout: 60000, // Increased timeout for file uploads (60 seconds)
     headers: {
         'Content-Type': 'application/json',
     },
@@ -46,6 +46,22 @@ apiClient.interceptors.request.use(
             const token = await SecureStore.getItemAsync('token');
             if (token && config.headers) {
                 config.headers.Authorization = `Bearer ${token}`;
+            }
+            
+            // If data is FormData, remove Content-Type header to let axios set it with boundary
+            // React Native FormData needs special handling
+            if (config.data instanceof FormData) {
+                delete config.headers['Content-Type'];
+                // Ensure axios knows this is FormData for React Native
+                if (__DEV__) {
+                    // React Native FormData has _parts property (not in standard FormData type)
+                    const formData = config.data as any;
+                    const hasFiles = formData._parts ? formData._parts.length : 0;
+                    console.log('📤 Sending FormData request:', {
+                        url: config.url,
+                        hasFiles,
+                    });
+                }
             }
         } catch (error) {
             console.log('Error getting token:', error);

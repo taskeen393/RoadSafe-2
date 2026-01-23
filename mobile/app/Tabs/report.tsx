@@ -19,8 +19,8 @@ import {
 } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 
-// Import report service
-import { reportService } from '../services';
+// Import services
+import { reportService, weatherService } from '../services';
 import { ReportRequest } from '../services/types';
 
 export default function ReportScreen({ navigation }: any) {
@@ -28,6 +28,8 @@ export default function ReportScreen({ navigation }: any) {
   const [location, setLocation] = useState('');
   const [lat, setLat] = useState<number | null>(null);
   const [lon, setLon] = useState<number | null>(null);
+  const [isFetchingLocation, setIsFetchingLocation] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
 
   const [textInput, setTextInput] = useState('');
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
@@ -49,23 +51,43 @@ export default function ReportScreen({ navigation }: any) {
     };
     checkAuth();
   }, []);
-
-  // 🌍 Get user location
   const getLocation = async () => {
     try {
-      let { status } = await Location.requestForegroundPermissionsAsync();
+      setIsFetchingLocation(true);
+
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      console.log('✅ Location permission status:', status);
+      const enabled = await Location.hasServicesEnabledAsync();
+console.log('Location services enabled:', enabled);
       if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'Location access is required to report.');
+        setLocationError('Permission denied');
+        Alert.alert('Permission denied', 'Please enable location permission in your device settings.');
         return;
       }
-      let loc = await Location.getCurrentPositionAsync({});
-      setLocation(`Lat: ${loc.coords.latitude.toFixed(4)}, Lon: ${loc.coords.longitude.toFixed(4)}`);
-      setLat(loc.coords.latitude);
-      setLon(loc.coords.longitude);
+
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+      const { latitude, longitude } = loc.coords;
+
+      console.log('✅ Location fetched:', latitude, longitude);
+      setLat(latitude);
+      setLon(longitude);
+
+      const reverse = await Location.reverseGeocodeAsync({ latitude, longitude });
+      console.log('✅ Reverse geocoded:', reverse);
+      const locStr = reverse[0]
+        ? `${reverse[0].name}, ${reverse[0].city}, ${reverse[0].country}`
+        : `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
+      console.log('✅ Location string:', locStr);
+      setLocation(locStr);
     } catch (err) {
-      console.log('Location error', err);
+      console.log('❌ Location fetch error:', err);
+      Alert.alert('Error', 'Failed to fetch location');
+      setLocationError('Failed to fetch location');
+    } finally {
+      setIsFetchingLocation(false);
     }
   };
+
 
   useEffect(() => {
     getLocation();
@@ -147,10 +169,13 @@ export default function ReportScreen({ navigation }: any) {
 
   // ✅ Submit report using reportService
   const submitReport = async () => {
-    if (!location || lat === null || lon === null) {
-      Alert.alert('Location not ready', 'Please wait for location to be fetched.');
-      return;
+    // If location isn't ready yet, retry once to avoid a "stuck" UX
+    if (lat === null || lon === null) {
+      await getLocation();
+      // Wait a bit for location to be set
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
+
     if (!textInput.trim() && selectedImages.length === 0 && selectedVideos.length === 0) {
       Alert.alert('Add something', 'Please add text, image or video before submitting.');
       return;
@@ -161,17 +186,39 @@ export default function ReportScreen({ navigation }: any) {
 
     setIsSubmitting(true);
 
+    // Ensure location is set - use coordinates if location string is empty
+    let safeLocation = location;
+    if (!safeLocation || safeLocation.trim() === '' || safeLocation === 'Unknown location') {
+      if (lat !== null && lon !== null) {
+        safeLocation = `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
+      } else {
+        safeLocation = 'Unknown location';
+      }
+    }
+    const safeLat = lat ?? 0;
+    const safeLon = lon ?? 0;
+
     const reportData: ReportRequest = {
       user,
-      location,
-      lat,
-      lon,
+      location: safeLocation,
+      lat: safeLat,
+      lon: safeLon,
       title: textInput.slice(0, 30) || 'No title',
       description: textInput || 'No description',
       imageUris: selectedImages,
       videoUris: selectedVideos,
       dateTime: new Date().toISOString(),
     };
+
+    if (__DEV__) {
+      console.log('📤 Submitting report:', {
+        location: safeLocation,
+        lat: safeLat,
+        lon: safeLon,
+        hasLocation: !!location,
+        locationState: location,
+      });
+    }
 
     try {
       await reportService.submitReport(reportData);
@@ -200,7 +247,16 @@ export default function ReportScreen({ navigation }: any) {
 
           <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
             <FontAwesome name="map-marker" size={18} color="#2E8B57" style={{ marginRight: 5 }} />
-            <Text style={styles.locationText}>Your Location: {location || 'Fetching...'}</Text>
+            <Text style={styles.locationText}>
+              Your Location:{' '}
+              {location
+                ? location
+                : isFetchingLocation
+                  ? 'Fetching...'
+                  : locationError
+                    ? 'Unavailable'
+                    : 'Fetching...'}
+            </Text>
           </View>
         </View>
 

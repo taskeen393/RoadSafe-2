@@ -1,11 +1,64 @@
 import express from 'express';
-import { addReport, getReports } from '../controllers/reportController.js';
+import multer from 'multer';
+import { addReport, getReports, updateReport, deleteReport } from '../controllers/reportController.js';
 import { protect } from '../middleware/authMiddleware.js';
+import { upload } from '../middleware/uploadMiddleware.js';
 
 const router = express.Router();
 
-router.post('/', protect, addReport);
+// Multer error handler middleware
+const handleMulterError = (err, req, res, next) => {
+  console.error('❌ Multer error:', err);
+  console.error('Error details:', {
+    code: err.code,
+    field: err.field,
+    message: err.message,
+    stack: err.stack
+  });
+  
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ message: 'File too large. Maximum size is 8MB.' });
+    }
+    if (err.code === 'LIMIT_FILE_COUNT') {
+      return res.status(400).json({ message: 'Too many files. Maximum is 5 images.' });
+    }
+    return res.status(400).json({ message: `Upload error: ${err.message}` });
+  }
+  if (err) {
+    return res.status(400).json({ message: err.message || 'File upload error' });
+  }
+  next();
+};
+
+// Handle OPTIONS preflight requests for CORS
+router.options('/', (req, res) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.sendStatus(200);
+});
+
+// Expect multipart/form-data for image uploads (field name: "images")
+// Note: upload.array allows 0-5 files, so reports without images are allowed
+router.post('/', 
+  (req, res, next) => {
+    console.log('📤 POST /api/report received', {
+      contentType: req.headers['content-type'],
+      contentLength: req.headers['content-length'],
+      hasAuth: !!req.headers.authorization,
+      method: req.method,
+    });
+    next();
+  },
+  protect, 
+  upload.array('images', 5), 
+  handleMulterError, 
+  addReport
+);
 router.get('/', protect, getReports);
+router.put('/:id', protect, upload.array('images', 5), handleMulterError, updateReport);
+router.delete('/:id', protect, deleteReport);
 
 export default router;
 
