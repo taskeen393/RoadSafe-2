@@ -18,23 +18,31 @@ import {
 
 // Import auth context
 import { useAuth } from "../context/AuthContext";
+import { userService } from "../services";
 
 const { width } = Dimensions.get("window");
 
 export default function AccountScreen() {
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, logout, refreshUser } = useAuth();
 
   const [image, setImage] = useState<string | null>(null);
   const [editingImage, setEditingImage] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
-  // Load profile image
+  // Load profile image from user object or SecureStore (fallback)
   useEffect(() => {
     (async () => {
-      const saved = await SecureStore.getItemAsync("profileImage");
-      if (saved) setImage(saved);
+      // First try to get from user object (from backend)
+      if (user?.profileImage) {
+        setImage(user.profileImage);
+      } else {
+        // Fallback to SecureStore for backwards compatibility
+        const saved = await SecureStore.getItemAsync("profileImage");
+        if (saved) setImage(saved);
+      }
     })();
-  }, []);
+  }, [user]);
 
   // Pick Image + Built-in Crop
   const pickImage = async () => {
@@ -78,13 +86,34 @@ export default function AccountScreen() {
     setEditingImage(result.uri);
   };
 
-  // Save Edited Image
+  // Save Edited Image to Cloudinary
   const saveImage = async () => {
     if (!editingImage) return;
-    await SecureStore.setItemAsync("profileImage", editingImage);
-    setImage(editingImage);
-    setEditingImage(null);
-    Alert.alert("Saved", "Profile picture updated");
+
+    setIsUploading(true);
+    try {
+      // Upload to Cloudinary via backend
+      const result = await userService.updateProfile({
+        profileImageUri: editingImage,
+      });
+
+      if (result.user?.profileImage) {
+        setImage(result.user.profileImage);
+        // Also save to SecureStore for backwards compatibility
+        await SecureStore.setItemAsync("profileImage", result.user.profileImage);
+        
+        // Update AuthContext with new user data
+        await refreshUser();
+      }
+
+      setEditingImage(null);
+      Alert.alert("Success", "Profile picture updated successfully");
+    } catch (error: any) {
+      console.error("Error uploading profile picture:", error);
+      Alert.alert("Error", error.msg || "Failed to update profile picture");
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   // Logout using AuthContext
@@ -148,8 +177,14 @@ export default function AccountScreen() {
                 </TouchableOpacity>
               </View>
 
-              <TouchableOpacity style={styles.saveBtn} onPress={saveImage}>
-                <Text style={styles.saveText}>Save</Text>
+              <TouchableOpacity 
+                style={[styles.saveBtn, isUploading && { opacity: 0.7 }]} 
+                onPress={saveImage}
+                disabled={isUploading}
+              >
+                <Text style={styles.saveText}>
+                  {isUploading ? 'Uploading...' : 'Save'}
+                </Text>
               </TouchableOpacity>
             </>
           )}

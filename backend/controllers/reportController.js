@@ -1,6 +1,80 @@
 import Report from '../models/Report1.js';
 import { initCloudinary } from '../config/cloudinary.js';
 
+/**
+ * Extract public_id from Cloudinary URL
+ * URL format: https://res.cloudinary.com/{cloud_name}/{resource_type}/upload/v{version}/{folder}/{public_id}.{format}
+ * Example: https://res.cloudinary.com/moinuddin/image/upload/v1769188624/roadsafe/reports/v5lqyatra57amwrmnlyn.jpg
+ * Public ID should be: roadsafe/reports/v5lqyatra57amwrmnlyn
+ */
+function extractPublicIdFromUrl(url, resourceType = 'image') {
+  try {
+    // Match the pattern to extract everything after /upload/v{version}/
+    // This includes folder path and filename
+    const match = url.match(/\/upload\/v\d+\/(.+)$/);
+    if (match && match[1]) {
+      // Remove file extension but keep folder path
+      const publicId = match[1].replace(/\.(jpg|jpeg|png|gif|webp|mp4|mov|avi|mkv|webm)$/i, '');
+      return publicId;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error extracting public_id from URL:', url, error);
+    return null;
+  }
+}
+
+/**
+ * Delete files from Cloudinary
+ * @param {string[]} urls - Array of Cloudinary URLs
+ * @param {string} resourceType - 'image' or 'video'
+ */
+async function deleteFromCloudinary(urls, resourceType = 'image') {
+  if (!urls || urls.length === 0) return;
+
+  const cloudinaryConfig = initCloudinary();
+  if (!cloudinaryConfig) {
+    console.warn('⚠️ Cloudinary not configured, skipping deletion');
+    return;
+  }
+
+  const { cloudinary } = cloudinaryConfig;
+  const publicIds = urls
+    .map(url => extractPublicIdFromUrl(url, resourceType))
+    .filter(id => id !== null);
+
+  if (publicIds.length === 0) {
+    console.warn('⚠️ No valid public_ids extracted from URLs');
+    return;
+  }
+
+  console.log(`🗑️ Deleting ${publicIds.length} ${resourceType}(s) from Cloudinary:`, publicIds);
+
+  try {
+    // Delete multiple files at once
+    const result = await cloudinary.api.delete_resources(publicIds, {
+      resource_type: resourceType,
+      type: 'upload',
+    });
+
+    if (result.deleted) {
+      console.log(`✅ Successfully deleted ${Object.keys(result.deleted).length} ${resourceType}(s)`);
+      Object.entries(result.deleted).forEach(([publicId, status]) => {
+        if (status === 'not_found') {
+          console.warn(`⚠️ ${resourceType} not found in Cloudinary: ${publicId}`);
+        }
+      });
+    }
+
+    if (result.not_found && result.not_found.length > 0) {
+      console.warn(`⚠️ ${result.not_found.length} ${resourceType}(s) not found:`, result.not_found);
+    }
+  } catch (error) {
+    console.error(`❌ Error deleting ${resourceType}(s) from Cloudinary:`, error);
+    // Don't throw - we don't want to fail the request if deletion fails
+  }
+}
+
 function toNumber(value) {
   if (value === undefined || value === null || value === '') return undefined;
   const n = Number(value);
@@ -300,6 +374,13 @@ export const updateReport = async (req, res) => {
       }
     }
 
+    // Determine which old files to delete
+    const oldImageUris = Array.isArray(report.imageUris) ? report.imageUris : [];
+    const oldVideoUris = Array.isArray(report.videoUris) ? report.videoUris : [];
+    
+    let newImageUris = oldImageUris;
+    let newVideoUris = oldVideoUris;
+
     // Update report fields
     const updateData = {};
     if (req.body.title) updateData.title = req.body.title;
@@ -307,19 +388,43 @@ export const updateReport = async (req, res) => {
     if (req.body.location !== undefined) updateData.location = req.body.location;
     if (req.body.lat !== undefined) updateData.lat = toNumber(req.body.lat);
     if (req.body.lon !== undefined) updateData.lon = toNumber(req.body.lon);
+    
     if (uploadedImageUrls.length > 0) {
       // Replace existing images with new ones
+      newImageUris = uploadedImageUrls;
       updateData.imageUris = uploadedImageUrls;
     } else if (req.body.imageUris !== undefined) {
       // Allow updating imageUris from body if no new files uploaded
-      updateData.imageUris = parseMaybeJsonArray(req.body.imageUris);
+      newImageUris = parseMaybeJsonArray(req.body.imageUris);
+      updateData.imageUris = newImageUris;
     }
+    
     if (uploadedVideoUrls.length > 0) {
       // Replace existing videos with new ones
+      newVideoUris = uploadedVideoUrls;
       updateData.videoUris = uploadedVideoUrls;
     } else if (req.body.videoUris !== undefined) {
       // Allow updating videoUris from body if no new files uploaded
-      updateData.videoUris = parseMaybeJsonArray(req.body.videoUris);
+      newVideoUris = parseMaybeJsonArray(req.body.videoUris);
+      updateData.videoUris = newVideoUris;
+    }
+
+    // Delete old images that are no longer in the new list
+    if (uploadedImageUrls.length > 0 || req.body.imageUris !== undefined) {
+      const imagesToDelete = oldImageUris.filter(url => !newImageUris.includes(url));
+      if (imagesToDelete.length > 0) {
+        console.log(`🗑️ Deleting ${imagesToDelete.length} old image(s) from Cloudinary`);
+        await deleteFromCloudinary(imagesToDelete, 'image');
+      }
+    }
+
+    // Delete old videos that are no longer in the new list
+    if (uploadedVideoUrls.length > 0 || req.body.videoUris !== undefined) {
+      const videosToDelete = oldVideoUris.filter(url => !newVideoUris.includes(url));
+      if (videosToDelete.length > 0) {
+        console.log(`🗑️ Deleting ${videosToDelete.length} old video(s) from Cloudinary`);
+        await deleteFromCloudinary(videosToDelete, 'video');
+      }
     }
 
     const updatedReport = await Report.findByIdAndUpdate(
@@ -328,6 +433,7 @@ export const updateReport = async (req, res) => {
       { new: true, runValidators: true }
     );
 
+    console.log(`✅ Report ${req.params.id} updated successfully`);
     res.status(200).json(updatedReport);
   } catch (error) {
     console.error("Update report error:", error.message);
@@ -349,7 +455,26 @@ export const deleteReport = async (req, res) => {
       return res.status(403).json({ message: 'Not authorized to delete this report' });
     }
 
+    // Delete images and videos from Cloudinary before deleting the report
+    const imageUris = Array.isArray(report.imageUris) ? report.imageUris : [];
+    const videoUris = Array.isArray(report.videoUris) ? report.videoUris : [];
+
+    console.log(`🗑️ Deleting report ${req.params.id} with ${imageUris.length} image(s) and ${videoUris.length} video(s)`);
+
+    // Delete images from Cloudinary
+    if (imageUris.length > 0) {
+      await deleteFromCloudinary(imageUris, 'image');
+    }
+
+    // Delete videos from Cloudinary
+    if (videoUris.length > 0) {
+      await deleteFromCloudinary(videoUris, 'video');
+    }
+
+    // Delete the report from database
     await Report.findByIdAndDelete(req.params.id);
+    
+    console.log(`✅ Report ${req.params.id} deleted successfully`);
     res.status(200).json({ message: 'Report deleted successfully' });
   } catch (error) {
     console.error("Delete report error:", error.message);

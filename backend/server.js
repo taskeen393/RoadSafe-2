@@ -10,6 +10,7 @@ import authRoutes from './routes/auth.js';
 import chatbotRoute from './routes/chatbot.js';
 import reportRoutes from './routes/report.js';
 import trackRoute from './routes/track.js';
+import userRoutes from './routes/user.js';
 
 dotenv.config();
 
@@ -58,6 +59,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/report', reportRoutes);
 app.use('/api/chatbot', chatbotRoute);
 app.use('/api/sos', trackRoute);
+app.use('/api/user', userRoutes);
 
 // Root route
 app.get('/', (req, res) => {

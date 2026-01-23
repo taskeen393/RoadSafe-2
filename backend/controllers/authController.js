@@ -20,7 +20,13 @@ export const signup = async (req, res) => {
     const token = genToken(newUser._id);
 
     res.status(201).json({
-      user: { id: newUser._id, name: newUser.name, email: newUser.email },
+      user: { 
+        id: newUser._id, 
+        _id: newUser._id,
+        name: newUser.name, 
+        email: newUser.email,
+        profileImage: newUser.profileImage || null,
+      },
       token,
     });
   } catch (error) {
@@ -42,7 +48,13 @@ export const login = async (req, res) => {
     const token = genToken(user._id);
 
     res.status(200).json({
-      user: { id: user._id, name: user.name, email: user.email },
+      user: { 
+        id: user._id,
+        _id: user._id,
+        name: user.name, 
+        email: user.email,
+        profileImage: user.profileImage || null,
+      },
       token,
     });
   } catch (error) {

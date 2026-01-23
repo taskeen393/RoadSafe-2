@@ -13,6 +13,7 @@ export * as reportService from './reportService';
 export * as chatbotService from './chatbotService';
 export * as sosService from './sosService';
 export * as weatherService from './weatherService';
+export * as userService from './userService';
 
 // Types
 export * from './types';
