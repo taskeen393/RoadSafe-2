@@ -20,7 +20,22 @@ export const login = async (data: LoginRequest): Promise<AuthResponse> => {
         const response = await apiClient.post<AuthResponse>('/auth/login', data);
         return response.data;
     } catch (error: any) {
-        throw error.response?.data || { msg: 'Login failed' };
+        // Handle network errors (no response from server)
+        if (!error.response) {
+            const networkError = {
+                msg: 'Network error: Cannot connect to server. Make sure backend is running.',
+                message: error.message || 'Network error',
+                code: error.code
+            };
+            throw networkError;
+        }
+        
+        const errorData = error.response?.data || { message: 'Login failed' };
+        // Normalize error format - backend uses 'message', frontend expects 'msg'
+        if (errorData.message && !errorData.msg) {
+            errorData.msg = errorData.message;
+        }
+        throw errorData;
     }
 };
 
@@ -32,7 +47,22 @@ export const signup = async (data: SignupRequest): Promise<AuthResponse> => {
         const response = await apiClient.post<AuthResponse>('/auth/signup', data);
         return response.data;
     } catch (error: any) {
-        throw error.response?.data || { msg: 'Signup failed' };
+        // Handle network errors (no response from server)
+        if (!error.response) {
+            const networkError = {
+                msg: 'Network error: Cannot connect to server. Make sure backend is running.',
+                message: error.message || 'Network error',
+                code: error.code
+            };
+            throw networkError;
+        }
+        
+        const errorData = error.response?.data || { message: 'Signup failed' };
+        // Normalize error format - backend uses 'message', frontend expects 'msg'
+        if (errorData.message && !errorData.msg) {
+            errorData.msg = errorData.message;
+        }
+        throw errorData;
     }
 };
 

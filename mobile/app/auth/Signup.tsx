@@ -9,11 +9,13 @@ import {
   TouchableOpacity
 } from 'react-native';
 
-// Import auth service
+// Import auth service and context
 import { authService } from '../services';
+import { useAuth } from '../context/AuthContext';
 
 export default function Signup() {
   const router = useRouter();
+  const { login: loginContext } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -33,8 +35,18 @@ export default function Signup() {
     try {
       const response = await authService.signup({ name, email, password });
 
+      // Transform backend response (id -> _id) to match frontend types
+      const user = {
+        _id: response.user.id || response.user._id,
+        name: response.user.name,
+        email: response.user.email,
+      };
+
       // Store token and user using authService
-      await authService.saveAuthCredentials(response.token, response.user);
+      await authService.saveAuthCredentials(response.token, user);
+      
+      // Update AuthContext
+      await loginContext(response.token, user);
 
       Alert.alert('Success', 'Account created!');
       router.replace('/Tabs'); // Redirect to dashboard

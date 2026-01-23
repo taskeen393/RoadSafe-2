@@ -9,11 +9,13 @@ import {
   TouchableOpacity,
 } from 'react-native';
 
-// Import auth service
+// Import auth service and context
 import { authService } from '../services';
+import { useAuth } from '../context/AuthContext';
 
 export default function Login() {
   const router = useRouter();
+  const { login: loginContext } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -27,10 +29,22 @@ export default function Login() {
     setLoading(true);
 
     try {
+      console.log(email, password);
       const response = await authService.login({ email, password });
 
+      console.log(response);
+      // Transform backend response (id -> _id) to match frontend types
+      const user = {
+        _id: response.user._id,
+        name: response.user.name,
+        email: response.user.email,
+      };
+
       // ✅ Save token & user using authService
-      await authService.saveAuthCredentials(response.token, response.user);
+      await authService.saveAuthCredentials(response.token, user);
+      
+      // ✅ Update AuthContext
+      await loginContext(response.token, user);
 
       // ✅ Direct to dashboard
       router.replace('/Tabs');
@@ -38,7 +52,7 @@ export default function Login() {
     } catch (error: any) {
       Alert.alert(
         'Login failed',
-        error?.msg || 'Invalid credentials'
+        error?.msg || error?.message || 'Invalid credentials'
       );
     } finally {
       setLoading(false);

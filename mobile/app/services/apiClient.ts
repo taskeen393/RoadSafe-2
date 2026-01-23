@@ -10,8 +10,20 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
-// Base URL for backend API
-export const API_BASE_URL = 'http://192.168.2.104:5000/api';
+// Base URL for backend API - Uses environment variable
+// For physical devices/emulators, use your computer's IP address instead of localhost
+// Example: 'http://192.168.1.100:5000/api'
+// To set: Create a .env file with EXPO_PUBLIC_API_URL=http://your-ip:5000/api
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
+
+// Log API base URL in development to help debug connection issues
+if (__DEV__) {
+    console.log('🔗 API Base URL:', API_BASE_URL || '⚠️ NOT SET - API calls will fail!');
+    if (!process.env.EXPO_PUBLIC_API_URL) {
+        console.warn('⚠️ EXPO_PUBLIC_API_URL not set, using default:', API_BASE_URL);
+        console.warn('💡 For physical devices, set EXPO_PUBLIC_API_URL to your computer IP address');
+    }
+}
 
 // External API keys
 export const GOOGLE_API_KEY = 'AIzaSyA9WotEPNh6PRm_rIR6x_OO7lCyfsF0uoI';
@@ -50,11 +62,24 @@ apiClient.interceptors.response.use(
     (response) => response,
     (error: AxiosError) => {
         if (__DEV__) {
-            console.log('API Error:', {
-                url: error.config?.url,
-                status: error.response?.status,
-                data: error.response?.data,
-            });
+            // Network error (no response from server)
+            if (!error.response) {
+                console.error('❌ Network Error:', {
+                    url: error.config?.url,
+                    fullUrl: error.config?.baseURL ? `${error.config.baseURL}${error.config.url || ''}` : 'unknown',
+                    message: error.message,
+                    code: error.code,
+                    hint: 'Check if backend is running and API_BASE_URL is correct'
+                });
+            } else {
+                // Server responded with error status
+                console.error('❌ API Error:', {
+                    url: error.config?.url,
+                    status: error.response?.status,
+                    statusText: error.response?.statusText,
+                    data: error.response?.data,
+                });
+            }
         }
 
         // Handle specific error codes

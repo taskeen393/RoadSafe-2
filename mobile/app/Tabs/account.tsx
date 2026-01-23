@@ -16,31 +16,23 @@ import {
   View,
 } from "react-native";
 
-// Import auth service
-import { authService } from "../services";
+// Import auth context
+import { useAuth } from "../context/AuthContext";
 
 const { width } = Dimensions.get("window");
 
 export default function AccountScreen() {
   const router = useRouter();
+  const { user, logout } = useAuth();
 
   const [image, setImage] = useState<string | null>(null);
   const [editingImage, setEditingImage] = useState<string | null>(null);
-  const [userName, setUserName] = useState<string>("User Name");
-  const [userEmail, setUserEmail] = useState<string>("user@email.com");
 
-  // Load user info + profile image
+  // Load profile image
   useEffect(() => {
     (async () => {
       const saved = await SecureStore.getItemAsync("profileImage");
       if (saved) setImage(saved);
-
-      // Use authService to get current user
-      const user = await authService.getCurrentUser();
-      if (user) {
-        setUserName(user.name || "User Name");
-        setUserEmail(user.email || "user@email.com");
-      }
     })();
   }, []);
 
@@ -95,10 +87,16 @@ export default function AccountScreen() {
     Alert.alert("Saved", "Profile picture updated");
   };
 
-  // Logout using authService
+  // Logout using AuthContext
   const handleLogout = async () => {
-    await authService.logout();
-    router.replace("/auth/login");
+    try {
+      await logout();
+      router.replace("/auth/login");
+    } catch (error) {
+      console.log("Logout error:", error);
+      // Still redirect even if logout fails
+      router.replace("/auth/login");
+    }
   };
 
   return (
@@ -127,10 +125,10 @@ export default function AccountScreen() {
           {/* User Info Section */}
           <View style={styles.infoSection}>
             <Text style={styles.label}>Name</Text>
-            <Text style={styles.value}>{userName}</Text>
+            <Text style={styles.value}>{user?.name || "User Name"}</Text>
 
             <Text style={styles.label}>Email</Text>
-            <Text style={styles.value}>{userEmail}</Text>
+            <Text style={styles.value}>{user?.email || "user@email.com"}</Text>
           </View>
 
           {/* Image Editor */}

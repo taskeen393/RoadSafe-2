@@ -1,6 +1,6 @@
 // app/reportcontent.tsx
-import axios from 'axios';
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import apiClient from '../services/apiClient';
 
 export interface ReportItem {
   _id: string; // MongoDB id
@@ -33,7 +33,7 @@ const ReportProvider: React.FC<{ children: React.ReactNode }> = ({ children }) =
   // Fetch all reports from backend
   const refreshReports = async () => {
     try {
-      const res = await axios.get('http://192.168.2.104:5000/api/report'); 
+      const res = await apiClient.get('/report');
       setReports(res.data.reverse()); // newest first
     } catch (err) {
       console.log('Error fetching reports:', err);
