@@ -12,8 +12,19 @@ import * as SecureStore from 'expo-secure-store';
 import apiClient, { API_BASE_URL } from './apiClient';
 import { ReportRequest, ReportResponse } from './types';
 
-function guessMimeTypeFromUri(uri: string): string {
+function guessMimeTypeFromUri(uri: string, isVideo: boolean = false): string {
     const lower = uri.toLowerCase();
+    
+    if (isVideo) {
+        if (lower.endsWith('.mp4')) return 'video/mp4';
+        if (lower.endsWith('.mov')) return 'video/quicktime';
+        if (lower.endsWith('.avi')) return 'video/x-msvideo';
+        if (lower.endsWith('.mkv')) return 'video/x-matroska';
+        if (lower.endsWith('.webm')) return 'video/webm';
+        return 'video/mp4'; // Default for videos
+    }
+    
+    // Image MIME types
     if (lower.endsWith('.png')) return 'image/png';
     if (lower.endsWith('.webp')) return 'image/webp';
     if (lower.endsWith('.heic') || lower.endsWith('.heif')) return 'image/heic';
@@ -41,25 +52,64 @@ export const submitReport = async (data: ReportRequest): Promise<ReportResponse>
         // React Native FormData requires specific format
         if (data.imageUris && data.imageUris.length > 0) {
             data.imageUris.forEach((uri, idx) => {
-                const filename = `report_image_${Date.now()}_${idx}.jpg`;
-                const mimeType = guessMimeTypeFromUri(uri);
-                
-                // React Native FormData format - fetch handles this better than axios
-                formData.append('images', {
-                    uri: uri,
-                    type: mimeType,
-                    name: filename,
-                } as any);
+                // Only send local file URIs (file:// or content://), not remote URLs
+                if (uri.startsWith('file://') || uri.startsWith('content://')) {
+                    const filename = `report_image_${Date.now()}_${idx}.jpg`;
+                    const mimeType = guessMimeTypeFromUri(uri, false);
+                    
+                    // React Native FormData format - fetch handles this better than axios
+                    formData.append('images', {
+                        uri: uri,
+                        type: mimeType,
+                        name: filename,
+                    } as any);
+                }
             });
         }
 
-        // NOTE: videos are not implemented on backend yet (Cloudinary video upload differs).
-        // We keep the UI intact, but we won't upload videos until backend supports it.
+        // Send videos as files (backend expects "videos")
+        if (data.videoUris && data.videoUris.length > 0) {
+            let videoFilesAdded = 0;
+            data.videoUris.forEach((uri, idx) => {
+                // Only send local file URIs (file:// or content://), not remote URLs
+                if (uri.startsWith('file://') || uri.startsWith('content://')) {
+                    const filename = `report_video_${Date.now()}_${idx}.mp4`;
+                    const mimeType = guessMimeTypeFromUri(uri, true);
+                    
+                    // React Native FormData format for videos
+                    formData.append('videos', {
+                        uri: uri,
+                        type: mimeType,
+                        name: filename,
+                    } as any);
+                    videoFilesAdded++;
+                    
+                    if (__DEV__) {
+                        console.log(`📹 Adding video ${idx + 1}:`, { uri, mimeType, filename });
+                    }
+                } else {
+                    if (__DEV__) {
+                        console.log(`⚠️ Skipping video ${idx + 1} (not a local file):`, uri);
+                    }
+                }
+            });
+            
+            if (__DEV__) {
+                console.log(`✅ Added ${videoFilesAdded} video(s) to FormData`);
+            }
+        } else {
+            if (__DEV__) {
+                console.log('ℹ️ No videos to upload');
+            }
+        }
 
         if (__DEV__) {
             console.log('📤 Submitting report with FormData:', {
                 title: data.title,
                 imageCount: data.imageUris?.length || 0,
+                videoCount: data.videoUris?.length || 0,
+                imageUris: data.imageUris,
+                videoUris: data.videoUris,
                 location: data.location,
             });
         }

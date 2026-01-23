@@ -217,6 +217,10 @@ console.log('Location services enabled:', enabled);
         lon: safeLon,
         hasLocation: !!location,
         locationState: location,
+        imageCount: selectedImages.length,
+        videoCount: selectedVideos.length,
+        selectedImages: selectedImages,
+        selectedVideos: selectedVideos,
       });
     }
 

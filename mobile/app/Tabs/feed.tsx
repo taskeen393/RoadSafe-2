@@ -121,6 +121,9 @@ export default function FeedScreen() {
                 userId: userId,
                 user: r.user,
                 hasUserId: !!r.userId,
+                imageCount: Array.isArray(r.imageUris) ? r.imageUris.length : 0,
+                videoCount: Array.isArray(r.videoUris) ? r.videoUris.length : 0,
+                videoUris: r.videoUris,
               });
             }
             return {
@@ -139,6 +142,7 @@ export default function FeedScreen() {
           });
 
           setReports(mapped.reverse());
+          console.log('Reports:', mapped);
         } catch (err) {
           Alert.alert('Error', 'Failed to load reports');
         } finally {
@@ -277,7 +281,7 @@ export default function FeedScreen() {
             if (hasValidUserId) {
               // Primary check: userId match
               isOwner = String(currentUserId) === String(item.userId) || 
-                       currentUserId.toString() === item.userId.toString();
+                       currentUserId.toString() === item.userId?.toString();
             } else if (currentUserName && item.user) {
               // Fallback: username match (for old reports without userId or when userId is missing)
               const currentName = String(currentUserName).toLowerCase().trim();
@@ -389,17 +393,19 @@ export default function FeedScreen() {
                 )}
 
                 {/* Videos */}
-                {item.videoUris.length > 0 && (
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {item.videoUris && item.videoUris.length > 0 && (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
                     {item.videoUris.map((uri, i) => (
                       <TouchableOpacity
-                        key={`${uri}-${i}`}
+                        key={`video-${item._id}-${i}`}
                         onPress={() => openVideoViewer(item.videoUris, i)}
+                        activeOpacity={0.8}
                       >
-                        <View style={styles.videoPlaceholder}>
-                          <Text style={styles.videoText}>
-                            ▶ Video {i + 1}
-                          </Text>
+                        <View style={styles.videoThumbnail}>
+                          <View style={styles.videoPlayOverlay}>
+                            <MaterialIcons name="play-circle-filled" size={48} color="#fff" />
+                          </View>
+                          <Text style={styles.videoLabel}>Video {i + 1}</Text>
                         </View>
                       </TouchableOpacity>
                     ))}
@@ -432,12 +438,16 @@ export default function FeedScreen() {
             )}
             renderItem={({ item }) =>
               activeIsVideo ? (
-                <Video
-                  source={{ uri: item }}
-                  style={{ width, height }}
-                  resizeMode={ResizeMode.CONTAIN}
-                  useNativeControls
-                />
+                <View style={{ width, height, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }}>
+                  <Video
+                    source={{ uri: item }}
+                    style={{ width, height }}
+                    resizeMode={ResizeMode.CONTAIN}
+                    useNativeControls
+                    shouldPlay={false}
+                    isLooping={false}
+                  />
+                </View>
               ) : (
                 <Image
                   source={{ uri: item }}
@@ -582,6 +592,46 @@ const styles = StyleSheet.create({
   },
 
   videoText: { color: '#fff', fontWeight: '700' },
+
+  videoThumbnail: {
+    width: 140,
+    height: 120,
+    borderRadius: 12,
+    backgroundColor: '#1a1a1a',
+    marginRight: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+    borderWidth: 1,
+    borderColor: '#444',
+  },
+
+  videoPlayOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    borderRadius: 12,
+  },
+
+  videoLabel: {
+    position: 'absolute',
+    bottom: 8,
+    left: 8,
+    right: 8,
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '600',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    textAlign: 'center',
+  },
 
   modalClose: { position: 'absolute', top: 40, right: 20, zIndex: 10 },
   closeText: { color: '#fff', fontSize: 16 },

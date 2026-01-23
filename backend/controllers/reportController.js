@@ -40,21 +40,54 @@ export const getReports = async (req, res) => {
 export const addReport = async (req, res) => {
   try {
     const uploadedImageUrls = [];
-    const files = req.files || [];
-
-    // Upload images (if provided) to Cloudinary and store secure URLs
-    if (files.length) {
-      const cloudinaryConfig = initCloudinary();
-      
-      if (!cloudinaryConfig) {
-        return res.status(400).json({ 
-          message: 'Image upload requires Cloudinary configuration. Please configure CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET in backend/.env' 
-        });
+    const uploadedVideoUrls = [];
+    
+    // Handle files from multer - can be array or fields object
+    let imageFiles = [];
+    let videoFiles = [];
+    
+    console.log('📥 Received files:', {
+      hasFiles: !!req.files,
+      filesType: Array.isArray(req.files) ? 'array' : typeof req.files,
+      filesKeys: req.files && !Array.isArray(req.files) ? Object.keys(req.files) : 'N/A',
+      filesLength: Array.isArray(req.files) ? req.files.length : (req.files ? Object.keys(req.files).length : 0),
+    });
+    
+    if (req.files) {
+      if (Array.isArray(req.files)) {
+        // Single field upload (backwards compatibility)
+        imageFiles = req.files.filter(f => f.mimetype?.startsWith('image/'));
+        videoFiles = req.files.filter(f => f.mimetype?.startsWith('video/'));
+        console.log('📁 Array format - Images:', imageFiles.length, 'Videos:', videoFiles.length);
+      } else if (req.files.images || req.files.videos) {
+        // Fields upload (new format)
+        imageFiles = req.files.images || [];
+        videoFiles = req.files.videos || [];
+        console.log('📁 Fields format - Images:', imageFiles.length, 'Videos:', videoFiles.length);
+        if (videoFiles.length > 0) {
+          console.log('🎥 Video files details:', videoFiles.map(f => ({
+            fieldname: f.fieldname,
+            originalname: f.originalname,
+            mimetype: f.mimetype,
+            size: f.size,
+          })));
+        }
       }
+    }
 
+    const cloudinaryConfig = initCloudinary();
+    
+    if ((imageFiles.length > 0 || videoFiles.length > 0) && !cloudinaryConfig) {
+      return res.status(400).json({ 
+        message: 'Media upload requires Cloudinary configuration. Please configure CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET in backend/.env' 
+      });
+    }
+
+    // Upload images to Cloudinary
+    if (imageFiles.length > 0 && cloudinaryConfig) {
       const { cloudinary, folder } = cloudinaryConfig;
 
-      for (const file of files) {
+      for (const file of imageFiles) {
         try {
           const result = await new Promise((resolve, reject) => {
             const stream = cloudinary.uploader.upload_stream(
@@ -72,7 +105,7 @@ export const addReport = async (req, res) => {
 
           if (result?.secure_url) uploadedImageUrls.push(result.secure_url);
         } catch (uploadError) {
-          console.error('Cloudinary upload error:', uploadError);
+          console.error('Cloudinary image upload error:', uploadError);
           return res.status(500).json({ 
             message: 'Failed to upload image to Cloudinary. Please check your Cloudinary configuration.' 
           });
@@ -80,9 +113,65 @@ export const addReport = async (req, res) => {
       }
     }
 
-    // Backwards compatible: if client still sends imageUris in body, accept them if no files uploaded
+    // Upload videos to Cloudinary
+    if (videoFiles.length > 0 && cloudinaryConfig) {
+      console.log(`🎬 Starting upload of ${videoFiles.length} video(s) to Cloudinary`);
+      const { cloudinary, folder } = cloudinaryConfig;
+
+      for (let i = 0; i < videoFiles.length; i++) {
+        const file = videoFiles[i];
+        console.log(`📹 Uploading video ${i + 1}/${videoFiles.length}:`, {
+          originalname: file.originalname,
+          mimetype: file.mimetype,
+          size: file.size,
+        });
+        
+        try {
+          const result = await new Promise((resolve, reject) => {
+            const stream = cloudinary.uploader.upload_stream(
+              {
+                folder: `${folder}/videos`,
+                resource_type: 'video',
+                chunk_size: 6000000, // 6MB chunks for large videos
+              },
+              (err, uploadResult) => {
+                if (err) return reject(err);
+                return resolve(uploadResult);
+              }
+            );
+            stream.end(file.buffer);
+          });
+
+          if (result?.secure_url) {
+            uploadedVideoUrls.push(result.secure_url);
+            console.log(`✅ Video ${i + 1} uploaded successfully:`, result.secure_url);
+          } else {
+            console.warn(`⚠️ Video ${i + 1} uploaded but no secure_url in result`);
+          }
+        } catch (uploadError) {
+          console.error(`❌ Cloudinary video ${i + 1} upload error:`, uploadError);
+          return res.status(500).json({ 
+            message: 'Failed to upload video to Cloudinary. Please check your Cloudinary configuration.' 
+          });
+        }
+      }
+      console.log(`✅ All ${uploadedVideoUrls.length} video(s) uploaded successfully`);
+    } else if (videoFiles.length > 0) {
+      console.warn('⚠️ Videos provided but Cloudinary not configured');
+    }
+
+    // Backwards compatible: if client still sends imageUris/videoUris in body, accept them if no files uploaded
     const imageUrisFromBody = parseMaybeJsonArray(req.body.imageUris);
-    const finalImageUris = uploadedImageUrls.length ? uploadedImageUrls : imageUrisFromBody;
+    const videoUrisFromBody = parseMaybeJsonArray(req.body.videoUris);
+    
+    const finalImageUris = uploadedImageUrls.length > 0 ? uploadedImageUrls : imageUrisFromBody;
+    const finalVideoUris = uploadedVideoUrls.length > 0 ? uploadedVideoUrls : videoUrisFromBody;
+
+    console.log('💾 Saving report with:', {
+      imageCount: finalImageUris.length,
+      videoCount: finalVideoUris.length,
+      videoUris: finalVideoUris,
+    });
 
     const report = await Report.create({
       title: req.body.title,
@@ -93,8 +182,13 @@ export const addReport = async (req, res) => {
       lat: toNumber(req.body.lat),
       lon: toNumber(req.body.lon),
       imageUris: finalImageUris,
-      // NOTE: video uploads not supported yet; keep existing field for compatibility
-      videoUris: parseMaybeJsonArray(req.body.videoUris),
+      videoUris: finalVideoUris,
+    });
+
+    console.log('✅ Report created:', {
+      id: report._id,
+      imageCount: report.imageUris?.length || 0,
+      videoCount: report.videoUris?.length || 0,
     });
 
     res.status(201).json(report);
@@ -119,21 +213,37 @@ export const updateReport = async (req, res) => {
     }
 
     const uploadedImageUrls = [];
-    const files = req.files || [];
+    const uploadedVideoUrls = [];
+    
+    // Handle files from multer - can be array or fields object
+    let imageFiles = [];
+    let videoFiles = [];
+    
+    if (req.files) {
+      if (Array.isArray(req.files)) {
+        // Single field upload (backwards compatibility)
+        imageFiles = req.files.filter(f => f.mimetype?.startsWith('image/'));
+        videoFiles = req.files.filter(f => f.mimetype?.startsWith('video/'));
+      } else if (req.files.images || req.files.videos) {
+        // Fields upload (new format)
+        imageFiles = req.files.images || [];
+        videoFiles = req.files.videos || [];
+      }
+    }
+
+    const cloudinaryConfig = initCloudinary();
+    
+    if ((imageFiles.length > 0 || videoFiles.length > 0) && !cloudinaryConfig) {
+      return res.status(400).json({ 
+        message: 'Media upload requires Cloudinary configuration. Please configure CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET in backend/.env' 
+      });
+    }
 
     // Upload new images (if provided) to Cloudinary
-    if (files.length) {
-      const cloudinaryConfig = initCloudinary();
-      
-      if (!cloudinaryConfig) {
-        return res.status(400).json({ 
-          message: 'Image upload requires Cloudinary configuration. Please configure CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET in backend/.env' 
-        });
-      }
-
+    if (imageFiles.length > 0 && cloudinaryConfig) {
       const { cloudinary, folder } = cloudinaryConfig;
 
-      for (const file of files) {
+      for (const file of imageFiles) {
         try {
           const result = await new Promise((resolve, reject) => {
             const stream = cloudinary.uploader.upload_stream(
@@ -151,9 +261,40 @@ export const updateReport = async (req, res) => {
 
           if (result?.secure_url) uploadedImageUrls.push(result.secure_url);
         } catch (uploadError) {
-          console.error('Cloudinary upload error:', uploadError);
+          console.error('Cloudinary image upload error:', uploadError);
           return res.status(500).json({ 
             message: 'Failed to upload image to Cloudinary. Please check your Cloudinary configuration.' 
+          });
+        }
+      }
+    }
+
+    // Upload new videos (if provided) to Cloudinary
+    if (videoFiles.length > 0 && cloudinaryConfig) {
+      const { cloudinary, folder } = cloudinaryConfig;
+
+      for (const file of videoFiles) {
+        try {
+          const result = await new Promise((resolve, reject) => {
+            const stream = cloudinary.uploader.upload_stream(
+              {
+                folder: `${folder}/videos`,
+                resource_type: 'video',
+                chunk_size: 6000000, // 6MB chunks for large videos
+              },
+              (err, uploadResult) => {
+                if (err) return reject(err);
+                return resolve(uploadResult);
+              }
+            );
+            stream.end(file.buffer);
+          });
+
+          if (result?.secure_url) uploadedVideoUrls.push(result.secure_url);
+        } catch (uploadError) {
+          console.error('Cloudinary video upload error:', uploadError);
+          return res.status(500).json({ 
+            message: 'Failed to upload video to Cloudinary. Please check your Cloudinary configuration.' 
           });
         }
       }
@@ -173,7 +314,11 @@ export const updateReport = async (req, res) => {
       // Allow updating imageUris from body if no new files uploaded
       updateData.imageUris = parseMaybeJsonArray(req.body.imageUris);
     }
-    if (req.body.videoUris !== undefined) {
+    if (uploadedVideoUrls.length > 0) {
+      // Replace existing videos with new ones
+      updateData.videoUris = uploadedVideoUrls;
+    } else if (req.body.videoUris !== undefined) {
+      // Allow updating videoUris from body if no new files uploaded
       updateData.videoUris = parseMaybeJsonArray(req.body.videoUris);
     }
 
