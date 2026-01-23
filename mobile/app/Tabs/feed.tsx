@@ -30,6 +30,7 @@ interface ReportItem {
   _id: string;
   user: string;
   userId?: string;
+  userProfileImage?: string;
   location: string;
   lat?: number;
   lon?: number;
@@ -121,15 +122,32 @@ export default function FeedScreen() {
                 userId: userId,
                 user: r.user,
                 hasUserId: !!r.userId,
+                hasProfileImage: !!r.userProfileImage,
+                profileImage: r.userProfileImage,
                 imageCount: Array.isArray(r.imageUris) ? r.imageUris.length : 0,
                 videoCount: Array.isArray(r.videoUris) ? r.videoUris.length : 0,
-                videoUris: r.videoUris,
               });
             }
+            // Handle profile image - can be string, null, or undefined
+            let profileImage = undefined;
+            if (r.userProfileImage !== null && r.userProfileImage !== undefined && r.userProfileImage !== 'null') {
+              profileImage = String(r.userProfileImage);
+            }
+            
+            if (__DEV__ && userId) {
+              console.log(`📸 Report ${r._id} - User ${userId}:`, {
+                hasProfileImage: !!r.userProfileImage,
+                profileImage: profileImage,
+                rawProfileImage: r.userProfileImage,
+                type: typeof r.userProfileImage,
+              });
+            }
+            
             return {
               _id: String(r._id),
               user: String(r.user ?? 'Unknown User'),
               userId: userId,
+              userProfileImage: profileImage,
               location: String(r.location ?? 'Unknown location'),
               lat: typeof r.lat === 'number' ? r.lat : undefined,
               lon: typeof r.lon === 'number' ? r.lon : undefined,
@@ -188,6 +206,7 @@ export default function FeedScreen() {
         _id: String(r._id),
         user: String(r.user ?? 'Unknown User'),
         userId: r.userId ? String(r.userId) : undefined,
+        userProfileImage: r.userProfileImage ? String(r.userProfileImage) : undefined,
         location: String(r.location ?? 'Unknown location'),
         lat: typeof r.lat === 'number' ? r.lat : undefined,
         lon: typeof r.lon === 'number' ? r.lon : undefined,
@@ -226,6 +245,7 @@ export default function FeedScreen() {
                 _id: String(r._id),
                 user: String(r.user ?? 'Unknown User'),
                 userId: r.userId ? String(r.userId) : undefined,
+                userProfileImage: r.userProfileImage ? String(r.userProfileImage) : undefined,
                 location: String(r.location ?? 'Unknown location'),
                 lat: typeof r.lat === 'number' ? r.lat : undefined,
                 lon: typeof r.lon === 'number' ? r.lon : undefined,
@@ -237,6 +257,7 @@ export default function FeedScreen() {
               }));
 
               setReports(mapped.reverse());
+              console.log('Reports:', mapped);
               Alert.alert('Success', 'Report deleted successfully');
             } catch (error: any) {
               Alert.alert('Error', error.msg || 'Failed to delete report');
@@ -313,11 +334,30 @@ export default function FeedScreen() {
                 {/* User Row */}
                 <View style={styles.rowBetween}>
                   <View style={styles.row}>
-                    <MaterialCommunityIcons
-                      name="account-circle"
-                      size={36}
-                      color="#2E8B57"
-                    />
+                    {item.userProfileImage && item.userProfileImage !== 'null' && item.userProfileImage !== 'undefined' ? (
+                      <Image 
+                        source={{ uri: item.userProfileImage }} 
+                        style={styles.profileAvatar}
+                        onError={(e) => {
+                          console.log('❌ Error loading profile image:', {
+                            uri: item.userProfileImage,
+                            error: e.nativeEvent.error,
+                            userId: item.userId,
+                          });
+                        }}
+                        onLoad={() => {
+                          if (__DEV__) {
+                            console.log('✅ Profile image loaded successfully:', item.userProfileImage);
+                          }
+                        }}
+                      />
+                    ) : (
+                      <MaterialCommunityIcons
+                        name="account-circle"
+                        size={36}
+                        color="#2E8B57"
+                      />
+                    )}
                     <Text style={styles.user}>{item.user}</Text>
                   </View>
                   <View style={styles.row}>
@@ -564,6 +604,15 @@ const styles = StyleSheet.create({
 
   user: { marginLeft: 6, fontWeight: 'bold', color: '#2E8B57' },
   date: { fontSize: 12, color: '#777' },
+
+  profileAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#E8F5E9',
+    borderWidth: 1,
+    borderColor: '#2E8B57',
+  },
 
   location: {
     marginLeft: 4,

@@ -43,6 +43,7 @@ export interface ReportResponse {
     _id: string;
     user: string;
     userId?: string;
+    userProfileImage?: string;
     location: string;
     lat?: number;
     lon?: number;

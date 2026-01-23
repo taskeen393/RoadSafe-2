@@ -6,8 +6,11 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity
+  TouchableOpacity,
+  View,
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 
 // Import auth service and context
 import { authService } from '../services';
@@ -59,8 +62,18 @@ export default function Signup() {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Sign Up</Text>
+    <LinearGradient colors={['#E8F5E9', '#F9FFF9']} style={styles.gradient}>
+      <ScrollView contentContainerStyle={styles.container}>
+        {/* Logo Section */}
+        <View style={styles.logoContainer}>
+          <View style={styles.logoCircle}>
+            <MaterialCommunityIcons name="shield-check" size={60} color="#2E8B57" />
+          </View>
+          <Text style={styles.appName}>RoadSafe</Text>
+          <Text style={styles.tagline}>Stay Safe, Stay Connected</Text>
+        </View>
+
+        <Text style={styles.title}>Sign Up</Text>
 
       <TextInput
         style={styles.input}
@@ -104,17 +117,50 @@ export default function Signup() {
       <TouchableOpacity onPress={() => router.push('./login')}>
         <Text style={styles.linkText}>Already have an account? Login</Text>
       </TouchableOpacity>
-    </ScrollView>
+      </ScrollView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
+  gradient: {
+    flex: 1,
+  },
   container: {
     flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-    backgroundColor: '#F9FFF9'
+  },
+  logoContainer: {
+    alignItems: 'center',
+    marginBottom: 30,
+  },
+  logoCircle: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 5,
+    shadowColor: '#2E8B57',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    marginBottom: 15,
+  },
+  appName: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#2E8B57',
+    marginTop: 10,
+  },
+  tagline: {
+    fontSize: 14,
+    color: '#4E944F',
+    marginTop: 5,
+    fontStyle: 'italic',
   },
   title: {
     fontSize: 28,

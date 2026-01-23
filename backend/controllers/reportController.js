@@ -104,10 +104,98 @@ function parseMaybeJsonArray(value) {
 // Get all reports
 export const getReports = async (req, res) => {
   try {
+    const mongoose = (await import('mongoose')).default;
     const reports = await Report.find().sort({ _id: -1 });
-    res.status(200).json(reports);
+    
+    // Get user profile images for all unique userIds
+    const userIds = [...new Set(reports.map(r => r.userId).filter(Boolean))];
+    
+    console.log('📊 Fetching reports:', {
+      reportCount: reports.length,
+      uniqueUserIds: userIds.length,
+      userIds: userIds.slice(0, 5), // Log first 5
+    });
+    
+    if (userIds.length > 0) {
+      const User = (await import('../models/User.js')).default;
+      
+      // Convert string userIds to ObjectIds for query (userId is stored as String in Report)
+      const objectIds = userIds
+        .filter(id => mongoose.Types.ObjectId.isValid(id))
+        .map(id => new mongoose.Types.ObjectId(id));
+      
+      if (objectIds.length > 0) {
+        const users = await User.find({ _id: { $in: objectIds } }).select('_id profileImage');
+        
+        console.log('👤 Found users:', {
+          userCount: users.length,
+          usersWithProfile: users.filter(u => u.profileImage).length,
+        });
+        
+        // Create map: userId string -> profileImage (only for users with images)
+        const userProfileMap = {};
+        users.forEach(u => {
+          const idStr = u._id.toString();
+          // Only add to map if profileImage exists and is not null/empty
+          if (u.profileImage && u.profileImage.trim() !== '') {
+            userProfileMap[idStr] = u.profileImage;
+            console.log(`✅ User ${idStr} has profile image: ${u.profileImage}`);
+          } else {
+            console.log(`⚠️ User ${idStr} has NO profile image (value: ${u.profileImage})`);
+          }
+        });
+        
+        console.log('📋 User profile map (only users with images):', userProfileMap);
+        console.log('🔍 Looking for userIds in reports:', userIds);
+        console.log('🔑 Map keys (users with profile images):', Object.keys(userProfileMap));
+        
+        // Add profileImage to each report
+        const reportsWithProfiles = reports.map(report => {
+          const reportObj = report.toObject();
+          const reportUserId = report.userId ? String(report.userId).trim() : null;
+          
+          // Always set userProfileImage field
+          if (reportUserId && userProfileMap[reportUserId]) {
+            // User has a profile image
+            reportObj.userProfileImage = userProfileMap[reportUserId];
+            console.log(`✅ Report ${report._id}: Added profile image for user ${reportUserId}: ${userProfileMap[reportUserId]}`);
+          } else {
+            // User doesn't have a profile image or not found
+            reportObj.userProfileImage = null;
+            if (reportUserId) {
+              if (userProfileMap.hasOwnProperty(reportUserId)) {
+                console.log(`ℹ️ Report ${report._id}: User ${reportUserId} exists but has no profile image`);
+              } else {
+                console.log(`⚠️ Report ${report._id}: User ${reportUserId} not found in userProfileMap. Available keys:`, Object.keys(userProfileMap));
+              }
+            }
+          }
+          
+          return reportObj;
+        });
+        
+        res.status(200).json(reportsWithProfiles);
+      } else {
+        // Invalid ObjectIds, return reports without profile images
+        const reportsArray = reports.map(r => {
+          const obj = r.toObject();
+          obj.userProfileImage = null; // Explicitly set to null
+          return obj;
+        });
+        res.status(200).json(reportsArray);
+      }
+    } else {
+      // No userIds, just return reports as-is but with userProfileImage field
+      const reportsArray = reports.map(r => {
+        const obj = r.toObject();
+        obj.userProfileImage = null; // Explicitly set to null
+        return obj;
+      });
+      res.status(200).json(reportsArray);
+    }
   } catch (error) {
     console.error("Get reports error:", error.message);
+    console.error("Error stack:", error.stack);
     res.status(500).json({ message: error.message });
   }
 };
