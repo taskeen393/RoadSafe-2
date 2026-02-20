@@ -40,7 +40,14 @@ const G = {
 export default function Index() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
+
+  // Refresh user data on focus to get latest profileImage after login
+  useFocusEffect(
+    useCallback(() => {
+      refreshUser();
+    }, [])
+  );
 
   const [weatherData, setWeatherData] = useState<any>(null);
   const [locationName, setLocationName] = useState('');

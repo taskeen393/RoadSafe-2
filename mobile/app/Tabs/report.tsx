@@ -45,6 +45,7 @@ export default function ReportScreen({ navigation }: any) {
   const [lon, setLon] = useState<number | null>(null);
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
   const [textInput, setTextInput] = useState('');
+  const [titleInput, setTitleInput] = useState('');
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const [selectedVideos, setSelectedVideos] = useState<string[]>([]);
   const [mapVisible, setMapVisible] = useState(false);
@@ -128,6 +129,9 @@ export default function ReportScreen({ navigation }: any) {
   };
 
   const submitReport = async () => {
+    if (!titleInput.trim()) {
+      return Alert.alert('Missing Title', 'Please add a title for your report.');
+    }
     if (!textInput.trim() && selectedImages.length === 0 && selectedVideos.length === 0) {
       return Alert.alert('Add something', 'Please add text, image or video before submitting.');
     }
@@ -138,7 +142,7 @@ export default function ReportScreen({ navigation }: any) {
     const safeLocation = location || (lat ? `${lat.toFixed(4)}, ${lon?.toFixed(4)}` : 'Unknown location');
     const reportData: ReportRequest = {
       user, location: safeLocation, lat: lat ?? 0, lon: lon ?? 0,
-      title: (selectedType ? `[${selectedType}] ` : '') + (textInput.slice(0, 40) || 'No title'),
+      title: titleInput.trim(),
       description: textInput || 'No description',
       imageUris: selectedImages, videoUris: selectedVideos,
       dateTime: new Date().toISOString(),
@@ -146,7 +150,7 @@ export default function ReportScreen({ navigation }: any) {
 
     try {
       await reportService.submitReport(reportData);
-      setTextInput(''); setSelectedImages([]); setSelectedVideos([]); setSelectedType('');
+      setTextInput(''); setTitleInput(''); setSelectedImages([]); setSelectedVideos([]); setSelectedType('');
       Alert.alert('✅ Submitted', 'Your report has been sent successfully!');
     } catch (err: any) {
       Alert.alert('Error', err.msg || 'Failed to submit report');
@@ -206,7 +210,14 @@ export default function ReportScreen({ navigation }: any) {
 
         {/* ─── Description ─── */}
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Description</Text>
+          <Text style={styles.sectionLabel}>Incident Details</Text>
+          <TextInput
+            style={[styles.descInput, { minHeight: 50, marginBottom: 12 }]}
+            placeholder="Title (e.g. Heavy Traffic at Main St)"
+            placeholderTextColor={G.sub}
+            value={titleInput}
+            onChangeText={setTitleInput}
+          />
           <TextInput
             style={styles.descInput}
             placeholder="Describe what happened..."

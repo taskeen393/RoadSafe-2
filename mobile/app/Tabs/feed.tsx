@@ -1,5 +1,5 @@
 // app/Tabs/feed.tsx — Community Feed (Light + Dark Green Theme)
-import { Entypo, Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ResizeMode, Video } from 'expo-av';
 import { useFocusEffect } from '@react-navigation/native';
@@ -180,6 +180,7 @@ export default function FeedScreen() {
       {/* ─── Hero ─── */}
       <LinearGradient colors={[G.darkGreen, G.midGreen]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.hero, { paddingTop: insets.top + 12 }]}>
         <View style={styles.heroDeco} />
+        <View style={styles.heroDeco2} />
         <View style={styles.heroRow}>
           <View style={styles.heroIconWrap}>
             <Ionicons name="people" size={24} color="#fff" />
@@ -188,6 +189,12 @@ export default function FeedScreen() {
             <Text style={styles.heroTitle}>Community</Text>
             <Text style={styles.heroSub}>Updates from nearby travelers</Text>
           </View>
+          {reports.length > 0 && (
+            <View style={styles.statsBadge}>
+              <Text style={styles.statsNum}>{reports.length}</Text>
+              <Text style={styles.statsLabel}>Reports</Text>
+            </View>
+          )}
         </View>
       </LinearGradient>
 
@@ -202,39 +209,55 @@ export default function FeedScreen() {
         ListEmptyComponent={
           !loading ? (
             <View style={styles.empty}>
-              <Ionicons name="newspaper-outline" size={48} color={G.border} />
-              <Text style={styles.emptyText}>No reports yet</Text>
+              <View style={styles.emptyIconWrap}>
+                <MaterialCommunityIcons name="newspaper-variant-outline" size={40} color={G.midGreen} />
+              </View>
+              <Text style={styles.emptyTitle}>No reports yet</Text>
+              <Text style={styles.emptyText}>Be the first to share a road update with the community</Text>
             </View>
           ) : null
         }
         renderItem={({ item }) => {
           const hasLoc = item.lat !== undefined && item.lon !== undefined;
           const owner = isOwner(item);
+          const totalMedia = item.imageUris.length + item.videoUris.length;
 
           return (
             <View style={styles.card}>
+              {/* Top accent line */}
+              <LinearGradient
+                colors={[G.darkGreen, G.midGreen]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.cardAccent}
+              />
+
               {/* Header */}
               <View style={styles.cardHeader}>
                 <View style={styles.avatarWrap}>
                   {item.userProfileImage ? (
                     <Image source={{ uri: item.userProfileImage }} style={styles.avatar} />
                   ) : (
-                    <View style={styles.avatarPlaceholder}>
+                    <LinearGradient colors={[G.midGreen, G.darkGreen]} style={styles.avatarPlaceholder}>
                       <Text style={styles.avatarInitials}>{item.user.charAt(0).toUpperCase()}</Text>
-                    </View>
+                    </LinearGradient>
                   )}
+                  <View style={styles.onlineDot} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.userName} numberOfLines={1}>{item.user}</Text>
-                  <Text style={styles.timeText}>{timeAgo(item.dateTime)}</Text>
+                  <View style={styles.timeRow}>
+                    <Ionicons name="time-outline" size={11} color={G.sub} />
+                    <Text style={styles.timeText}>{timeAgo(item.dateTime)}</Text>
+                  </View>
                 </View>
                 {owner && (
                   <View style={styles.actions}>
                     <TouchableOpacity onPress={() => handleEdit(item)} style={styles.actionIcon}>
-                      <Ionicons name="create-outline" size={18} color={G.midGreen} />
+                      <Ionicons name="create-outline" size={16} color={G.midGreen} />
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => confirmDelete(item)} style={[styles.actionIcon, { backgroundColor: '#FEE2E2' }]}>
-                      <Ionicons name="trash-outline" size={18} color={G.red} />
+                      <Ionicons name="trash-outline" size={16} color={G.red} />
                     </TouchableOpacity>
                   </View>
                 )}
@@ -252,7 +275,9 @@ export default function FeedScreen() {
                     disabled={!hasLoc}
                     onPress={() => hasLoc && openMap(item.lat!, item.lon!)}
                   >
-                    <Ionicons name="location-sharp" size={14} color={G.midGreen} />
+                    <View style={styles.locIconWrap}>
+                      <Ionicons name="location-sharp" size={12} color={G.midGreen} />
+                    </View>
                     <Text style={styles.locText} numberOfLines={1}>{item.location}</Text>
                     {hasLoc && <Ionicons name="chevron-forward" size={12} color={G.midGreen} />}
                   </TouchableOpacity>
@@ -260,37 +285,32 @@ export default function FeedScreen() {
 
                 {/* Media Gallery */}
                 {(item.imageUris.length > 0 || item.videoUris.length > 0) && (
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, marginTop: 12 }}>
-                    {item.imageUris.map((uri, i) => (
-                      <TouchableOpacity key={i} onPress={() => openMedia(item.imageUris, i)} activeOpacity={0.9}>
-                        <Image source={{ uri }} style={styles.mediaThumb} />
-                      </TouchableOpacity>
-                    ))}
-                    {item.videoUris.map((uri, i) => (
-                      <TouchableOpacity key={i} onPress={() => openMedia(item.videoUris, i, true)} activeOpacity={0.9}>
-                        <View style={styles.videoThumb}>
-                          <Ionicons name="play" size={24} color="#fff" />
-                        </View>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
+                  <View style={styles.mediaSection}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
+                      {item.imageUris.map((uri, i) => (
+                        <TouchableOpacity key={i} onPress={() => openMedia(item.imageUris, i)} activeOpacity={0.9}>
+                          <Image source={{ uri }} style={styles.mediaThumb} />
+                          {i === 0 && totalMedia > 1 && (
+                            <View style={styles.mediaBadge}>
+                              <Ionicons name="images" size={10} color="#fff" />
+                              <Text style={styles.mediaBadgeText}>{totalMedia}</Text>
+                            </View>
+                          )}
+                        </TouchableOpacity>
+                      ))}
+                      {item.videoUris.map((uri, i) => (
+                        <TouchableOpacity key={i} onPress={() => openMedia(item.videoUris, i, true)} activeOpacity={0.9}>
+                          <View style={styles.videoThumb}>
+                            <View style={styles.playBtnBg}>
+                              <Ionicons name="play" size={20} color="#fff" />
+                            </View>
+                            <Text style={styles.videoLabel}>Video</Text>
+                          </View>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
                 )}
-              </View>
-
-              {/* Footer / Interaction */}
-              <View style={styles.cardFooter}>
-                <TouchableOpacity style={styles.interactBtn}>
-                  <Ionicons name="heart-outline" size={20} color={G.sub} />
-                  <Text style={styles.interactText}>Like</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.interactBtn}>
-                  <Ionicons name="chatbubble-outline" size={19} color={G.sub} />
-                  <Text style={styles.interactText}>Comment</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.interactBtn}>
-                  <Ionicons name="share-social-outline" size={20} color={G.sub} />
-                  <Text style={styles.interactText}>Share</Text>
-                </TouchableOpacity>
               </View>
             </View>
           );
@@ -341,15 +361,22 @@ export default function FeedScreen() {
       <Modal visible={editModalVisible} transparent animationType="fade">
         <View style={styles.editOverlay}>
           <View style={styles.editCard}>
-            <Text style={styles.editHeader}>Edit Post</Text>
+            <View style={styles.editHeaderRow}>
+              <View style={styles.editIconWrap}>
+                <Ionicons name="create" size={18} color={G.midGreen} />
+              </View>
+              <Text style={styles.editHeader}>Edit Post</Text>
+            </View>
             <TextInput style={styles.editInput} value={editTitle} onChangeText={setEditTitle} placeholder="Title" placeholderTextColor={G.sub} />
-            <TextInput style={[styles.editInput, { height: 100 }]} value={editDescription} onChangeText={setEditDescription} placeholder="Description" placeholderTextColor={G.sub} multiline textAlignVertical="top" />
+            <TextInput style={[styles.editInput, { height: 110 }]} value={editDescription} onChangeText={setEditDescription} placeholder="Description" placeholderTextColor={G.sub} multiline textAlignVertical="top" />
             <View style={styles.editBtns}>
               <TouchableOpacity onPress={() => setEditModalVisible(false)} style={[styles.editBtn, { backgroundColor: '#F3F4F6' }]}>
-                <Text style={{ color: G.sub }}>Cancel</Text>
+                <Ionicons name="close-outline" size={16} color={G.sub} />
+                <Text style={{ color: G.sub, fontWeight: '600' }}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity onPress={saveEdit} style={[styles.editBtn, { backgroundColor: G.darkGreen }]}>
-                <Text style={{ color: '#fff', fontWeight: 'bold' }}>Save</Text>
+                <Ionicons name="checkmark" size={16} color="#fff" />
+                <Text style={{ color: '#fff', fontWeight: '700' }}>Save</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -363,44 +390,63 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: G.bg },
 
   // Hero
-  hero: { paddingHorizontal: 20, paddingBottom: 22 },
+  hero: { paddingHorizontal: 20, paddingBottom: 22, overflow: 'hidden' },
   heroDeco: { position: 'absolute', top: -40, right: -20, width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(255,255,255,0.06)' },
+  heroDeco2: { position: 'absolute', bottom: -50, left: -20, width: 120, height: 120, borderRadius: 60, backgroundColor: 'rgba(255,255,255,0.04)' },
   heroRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   heroIconWrap: { width: 48, height: 48, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
   heroTitle: { fontSize: 22, fontWeight: '800', color: '#fff' },
-  heroSub: { fontSize: 13, color: 'rgba(255,255,255,0.7)' },
+  heroSub: { fontSize: 13, color: 'rgba(255,255,255,0.75)', marginTop: 2 },
+  statsBadge: { alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.18)', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 14 },
+  statsNum: { fontSize: 18, fontWeight: '800', color: '#fff' },
+  statsLabel: { fontSize: 10, fontWeight: '600', color: 'rgba(255,255,255,0.7)', marginTop: 1 },
 
   // Card
-  card: { backgroundColor: G.card, borderRadius: 20, marginBottom: 16, borderWidth: 1, borderColor: G.border, overflow: 'hidden', ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 10 }, android: { elevation: 3 } }) },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', padding: 14, gap: 10, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+  card: {
+    backgroundColor: G.card,
+    borderRadius: 20,
+    marginBottom: 18,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: { shadowColor: '#1A4D2E', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.08, shadowRadius: 14 },
+      android: { elevation: 4 },
+    }),
+  },
+  cardAccent: { height: 3, width: '100%' },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12 },
   avatarWrap: { position: 'relative' },
-  avatar: { width: 42, height: 42, borderRadius: 21, borderWidth: 1.5, borderColor: G.midGreen },
-  avatarPlaceholder: { width: 42, height: 42, borderRadius: 21, backgroundColor: G.lightGreen, justifyContent: 'center', alignItems: 'center', borderWidth: 1.5, borderColor: G.midGreen },
-  avatarInitials: { fontSize: 16, fontWeight: '700', color: G.midGreen },
-  userName: { fontSize: 15, fontWeight: '700', color: G.text },
+  avatar: { width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: G.midGreen },
+  avatarPlaceholder: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
+  avatarInitials: { fontSize: 17, fontWeight: '800', color: '#fff' },
+  onlineDot: { position: 'absolute', bottom: 1, right: 1, width: 11, height: 11, borderRadius: 6, backgroundColor: '#22C55E', borderWidth: 2, borderColor: '#fff' },
+  userName: { fontSize: 15, fontWeight: '700', color: G.text, letterSpacing: -0.2 },
+  timeRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
   timeText: { fontSize: 12, color: G.sub },
-  actions: { flexDirection: 'row', gap: 6 },
-  actionIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: G.lightGreen, justifyContent: 'center', alignItems: 'center' },
+  actions: { flexDirection: 'row', gap: 8 },
+  actionIcon: { width: 34, height: 34, borderRadius: 12, backgroundColor: G.lightGreen, justifyContent: 'center', alignItems: 'center' },
 
   // Body
-  cardBody: { padding: 14 },
-  cardTitle: { fontSize: 16, fontWeight: '700', color: G.text, marginBottom: 4 },
-  cardText: { fontSize: 14, lineHeight: 21, color: '#374151', marginBottom: 10 },
-  locBadge: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', backgroundColor: '#F0FDF4', paddingVertical: 4, paddingHorizontal: 10, borderRadius: 12, gap: 4, marginBottom: 10 },
-  locText: { fontSize: 12, color: G.midGreen, fontWeight: '600' },
+  cardBody: { paddingHorizontal: 16, paddingBottom: 18 },
+  cardTitle: { fontSize: 16, fontWeight: '700', color: G.text, marginBottom: 6, letterSpacing: -0.2 },
+  cardText: { fontSize: 14, lineHeight: 22, color: '#374151', marginBottom: 12 },
+  locBadge: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', backgroundColor: G.lightGreen, paddingVertical: 6, paddingHorizontal: 12, borderRadius: 14, gap: 6, marginBottom: 12, borderWidth: 1, borderColor: G.border },
+  locIconWrap: { width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(45,122,77,0.12)', justifyContent: 'center', alignItems: 'center' },
+  locText: { fontSize: 12, color: G.midGreen, fontWeight: '600', maxWidth: width * 0.55 },
 
   // Media
-  mediaThumb: { width: 140, height: 180, borderRadius: 12, backgroundColor: '#eee' },
-  videoThumb: { width: 140, height: 180, borderRadius: 12, backgroundColor: '#111827', justifyContent: 'center', alignItems: 'center' },
-
-  // Footer
-  cardFooter: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: '#F3F4F6', paddingVertical: 10 },
-  interactBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
-  interactText: { fontSize: 13, color: G.sub, fontWeight: '600' },
+  mediaSection: { marginTop: 4 },
+  mediaThumb: { width: 150, height: 190, borderRadius: 14, backgroundColor: '#eee' },
+  videoThumb: { width: 150, height: 190, borderRadius: 14, backgroundColor: '#111827', justifyContent: 'center', alignItems: 'center', gap: 6 },
+  playBtnBg: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
+  videoLabel: { fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.7)', letterSpacing: 0.5 },
+  mediaBadge: { position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.55)', flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10 },
+  mediaBadgeText: { fontSize: 11, fontWeight: '700', color: '#fff' },
 
   // Empty
-  empty: { alignItems: 'center', marginTop: 80, gap: 10 },
-  emptyText: { color: G.sub, fontSize: 16 },
+  empty: { alignItems: 'center', marginTop: 80, gap: 12, paddingHorizontal: 40 },
+  emptyIconWrap: { width: 72, height: 72, borderRadius: 36, backgroundColor: G.lightGreen, justifyContent: 'center', alignItems: 'center', marginBottom: 4 },
+  emptyTitle: { fontSize: 18, fontWeight: '700', color: G.text },
+  emptyText: { color: G.sub, fontSize: 14, textAlign: 'center', lineHeight: 21 },
 
   // Viewer
   closeBtn: { position: 'absolute', top: 50, right: 20, zIndex: 10, backgroundColor: 'rgba(255,255,255,0.2)', padding: 8, borderRadius: 20 },
@@ -409,9 +455,11 @@ const styles = StyleSheet.create({
 
   // Edit Modal
   editOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 },
-  editCard: { backgroundColor: '#fff', borderRadius: 20, padding: 20 },
-  editHeader: { fontSize: 18, fontWeight: '700', marginBottom: 16, color: G.text },
-  editInput: { backgroundColor: '#F9FAFB', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, padding: 12, marginBottom: 12, fontSize: 15 },
-  editBtns: { flexDirection: 'row', gap: 10, justifyContent: 'flex-end' },
-  editBtn: { paddingVertical: 10, paddingHorizontal: 20, borderRadius: 10 },
+  editCard: { backgroundColor: '#fff', borderRadius: 22, padding: 22 },
+  editHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 18 },
+  editIconWrap: { width: 36, height: 36, borderRadius: 12, backgroundColor: G.lightGreen, justifyContent: 'center', alignItems: 'center' },
+  editHeader: { fontSize: 18, fontWeight: '700', color: G.text },
+  editInput: { backgroundColor: '#F9FAFB', borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 14, padding: 14, marginBottom: 12, fontSize: 15, color: G.text },
+  editBtns: { flexDirection: 'row', gap: 10, justifyContent: 'flex-end', marginTop: 4 },
+  editBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 11, paddingHorizontal: 20, borderRadius: 12 },
 });
