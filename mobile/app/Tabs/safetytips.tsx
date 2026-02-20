@@ -1,28 +1,38 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+// app/Tabs/safetytips.tsx — Safety Guide (Light + Dark Green)
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState } from 'react';
 import {
   Alert,
+  Animated,
+  Platform,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-/* ================= REAL & USEFUL CONTENT ================= */
+// ─── Theme ───
+const G = {
+  bg: '#F4F7F4',
+  card: '#FFFFFF',
+  darkGreen: '#1A4D2E',
+  midGreen: '#2D7A4D',
+  lightGreen: '#E8F5ED',
+  text: '#1A1A1A',
+  sub: '#6B7280',
+  border: '#D1E8D9',
+};
 
-const TEXT = {
-  header: {
-    en: 'Safe Travel Guide – Northern Areas',
-    ur: 'شمالی علاقوں کے لیے محفوظ سفر کی مکمل رہنمائی',
-  },
-
-  mountainDriving: {
-    title: {
-      en: 'Mountain Driving Safety',
-      ur: 'پہاڑی علاقوں میں ڈرائیونگ کی حفاظت',
-    },
+// ─── Content ───
+const SECTIONS = [
+  {
+    key: 'mountain',
+    icon: 'terrain' as const,
+    color: '#1A4D2E',
+    title: { en: 'Mountain Driving Safety', ur: 'پہاڑی علاقوں میں ڈرائیونگ کی حفاظت' },
     en: [
       'Use engine braking while descending instead of continuous brakes.',
       'Avoid overtaking on blind curves or narrow mountain roads.',
@@ -40,12 +50,11 @@ const TEXT = {
       'پہاڑی علاقے میں داخل ہونے سے پہلے بریک چیک کریں۔',
     ],
   },
-
-  weatherSafety: {
-    title: {
-      en: 'Weather & Road Conditions',
-      ur: 'موسم اور سڑک کی صورتحال',
-    },
+  {
+    key: 'weather',
+    icon: 'weather-partly-cloudy' as const,
+    color: '#3B9EE8',
+    title: { en: 'Weather & Road Conditions', ur: 'موسم اور سڑک کی صورتحال' },
     en: [
       'Check weather updates from official sources before departure.',
       'Avoid traveling during heavy rain due to landslide risks.',
@@ -61,12 +70,11 @@ const TEXT = {
       'سڑک بند ہونے کی صورت میں اضافی وقت ساتھ رکھیں۔',
     ],
   },
-
-  vehiclePrep: {
-    title: {
-      en: 'Vehicle Preparation',
-      ur: 'گاڑی کی تیاری',
-    },
+  {
+    key: 'vehicle',
+    icon: 'car-wrench' as const,
+    color: '#8B5CF6',
+    title: { en: 'Vehicle Preparation', ur: 'گاڑی کی تیاری' },
     en: [
       'Ensure spare tire, jack, and toolkit are available.',
       'Fuel stations are limited; refuel whenever possible.',
@@ -82,12 +90,11 @@ const TEXT = {
       'ہیڈلائٹس اور فوگ لائٹس درست حالت میں ہوں۔',
     ],
   },
-
-  emergency: {
-    title: {
-      en: 'Emergency & Communication',
-      ur: 'ہنگامی صورتحال اور رابطہ',
-    },
+  {
+    key: 'emergency',
+    icon: 'phone-alert' as const,
+    color: '#E95B5B',
+    title: { en: 'Emergency & Communication', ur: 'ہنگامی صورتحال اور رابطہ' },
     en: [
       'Mobile network may not be available in remote valleys.',
       'Inform a trusted person about your travel route.',
@@ -103,196 +110,200 @@ const TEXT = {
       'سنسان علاقوں میں رات کو اکیلے سفر سے گریز کریں۔',
     ],
   },
+];
+
+const HEADER_TEXT = {
+  en: 'Safe Travel Guide',
+  ur: 'محفوظ سفر کی رہنمائی',
 };
 
 export default function SafetyTips() {
+  const insets = useSafeAreaInsets();
   const [isEnglish, setIsEnglish] = useState(true);
   const lang = isEnglish ? 'en' : 'ur';
+  const [openKeys, setOpenKeys] = useState<Record<string, boolean>>({});
 
-  const [open, setOpen] = useState({
-    mountain: false,
-    weather: false,
-    vehicle: false,
-    emergency: false,
-  });
-
-  const toggle = (key: keyof typeof open) =>
-    setOpen({ ...open, [key]: !open[key] });
+  const toggle = (key: string) => setOpenKeys(prev => ({ ...prev, [key]: !prev[key] }));
 
   const showContacts = () => {
     Alert.alert(
-      isEnglish ? 'Emergency & Advisors Contact' : 'ہنگامی اور رہنمائی رابطے',
+      isEnglish ? 'Emergency Contacts' : 'ہنگامی رابطے',
       isEnglish
-        ? `Police: 15
-Ambulance: 115
-Rescue: 1122
-
-Tourist Police Helpline:
-1422
-
-Travel Advisory:
-Always follow local administration instructions.`
-        : `پولیس: 15
-ایمبولینس: 115
-ریسکیو: 1122
-
-ٹورسٹ پولیس ہیلپ لائن:
-1422
-
-سفری ہدایات:
-ہمیشہ مقامی انتظامیہ کی ہدایات پر عمل کریں۔`,
+        ? `🚔 Police: 15\n🚑 Ambulance: 115\n🚒 Rescue: 1122\n📞 Tourist Police: 1422\n\nAlways follow local administration instructions.`
+        : `🚔 پولیس: 15\n🚑 ایمبولینس: 115\n🚒 ریسکیو: 1122\n📞 ٹورسٹ پولیس: 1422\n\nہمیشہ مقامی انتظامیہ کی ہدایات پر عمل کریں۔`,
       [{ text: isEnglish ? 'OK' : 'ٹھیک ہے' }],
     );
   };
 
-  const renderCard = (
-    title: string,
-    openState: boolean,
-    onPress: () => void,
-    items: string[],
-  ) => (
-    <View style={styles.card}>
-      <TouchableOpacity style={styles.cardHeader} onPress={onPress}>
-        <Text style={styles.cardTitle}>{title}</Text>
-        <MaterialCommunityIcons
-          name={openState ? 'chevron-up' : 'chevron-down'}
-          size={26}
-          color="#2E8B57"
-        />
-      </TouchableOpacity>
-
-      {openState && (
-        <View style={styles.content}>
-          {items.map((item, i) => (
-            <Text key={i} style={styles.text}>
-              {i + 1}. {item}
-            </Text>
-          ))}
-        </View>
-      )}
-    </View>
-  );
-
   return (
-    <ScrollView style={styles.container}>
-      {/* Language Toggle */}
-      <View style={styles.toggleRow}>
-        <Text style={styles.langText}>{isEnglish ? 'English' : 'Urdu'}</Text>
-        <Switch value={isEnglish} onValueChange={() => setIsEnglish(!isEnglish)} />
-      </View>
+    <View style={[styles.root, { paddingTop: insets.top }]}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
 
-      <Text style={styles.header}>{TEXT.header[lang]}</Text>
+        {/* ─── Hero ─── */}
+        <LinearGradient colors={[G.darkGreen, G.midGreen]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.hero, { paddingTop: insets.top + 12 }]}>
+          <View style={styles.heroDeco} />
+          <View style={styles.heroRow}>
+            <View style={styles.heroIconWrap}>
+              <MaterialCommunityIcons name="shield-check" size={24} color="#fff" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.heroTitle}>{HEADER_TEXT[lang]}</Text>
+              <Text style={styles.heroSub}>{isEnglish ? 'Northern Areas Edition' : 'شمالی علاقوں کا ایڈیشن'}</Text>
+            </View>
+          </View>
 
-      {renderCard(
-        TEXT.mountainDriving.title[lang],
-        open.mountain,
-        () => toggle('mountain'),
-        TEXT.mountainDriving[lang],
-      )}
+          {/* Language Toggle */}
+          <View style={styles.langToggle}>
+            <TouchableOpacity
+              style={[styles.langBtn, isEnglish && styles.langActive]}
+              onPress={() => setIsEnglish(true)}
+            >
+              <Text style={[styles.langText, isEnglish && { color: G.darkGreen }]}>English</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.langBtn, !isEnglish && styles.langActive]}
+              onPress={() => setIsEnglish(false)}
+            >
+              <Text style={[styles.langText, !isEnglish && { color: G.darkGreen }]}>اردو</Text>
+            </TouchableOpacity>
+          </View>
+        </LinearGradient>
 
-      {renderCard(
-        TEXT.weatherSafety.title[lang],
-        open.weather,
-        () => toggle('weather'),
-        TEXT.weatherSafety[lang],
-      )}
+        {/* ─── Sections ─── */}
+        <View style={styles.body}>
+          {SECTIONS.map((section) => {
+            const isOpen = !!openKeys[section.key];
+            const items = section[lang];
+            return (
+              <View key={section.key} style={styles.card}>
+                <TouchableOpacity style={styles.cardHeader} onPress={() => toggle(section.key)} activeOpacity={0.7}>
+                  <View style={[styles.cardIconWrap, { backgroundColor: section.color + '18' }]}>
+                    <MaterialCommunityIcons name={section.icon} size={20} color={section.color} />
+                  </View>
+                  <Text style={styles.cardTitle}>{section.title[lang]}</Text>
+                  <View style={[styles.chevronWrap, isOpen && { backgroundColor: G.lightGreen }]}>
+                    <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={18} color={isOpen ? G.midGreen : G.sub} />
+                  </View>
+                </TouchableOpacity>
 
-      {renderCard(
-        TEXT.vehiclePrep.title[lang],
-        open.vehicle,
-        () => toggle('vehicle'),
-        TEXT.vehiclePrep[lang],
-      )}
+                {isOpen && (
+                  <View style={styles.cardContent}>
+                    {items.map((item: string, i: number) => (
+                      <View key={i} style={styles.tipRow}>
+                        <View style={styles.tipDot}>
+                          <Text style={styles.tipNum}>{i + 1}</Text>
+                        </View>
+                        <Text style={styles.tipText}>{item}</Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+            );
+          })}
 
-      {renderCard(
-        TEXT.emergency.title[lang],
-        open.emergency,
-        () => toggle('emergency'),
-        TEXT.emergency[lang],
-      )}
+          {/* ─── Emergency Contact ─── */}
+          <TouchableOpacity onPress={showContacts} activeOpacity={0.88} style={{ marginTop: 6 }}>
+            <LinearGradient colors={[G.darkGreen, G.midGreen]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.contactBtn}>
+              <MaterialCommunityIcons name="phone-alert" size={20} color="#fff" />
+              <Text style={styles.contactText}>
+                {isEnglish ? 'Emergency Contacts' : 'ہنگامی رابطے'}
+              </Text>
+              <Ionicons name="chevron-forward" size={16} color="rgba(255,255,255,0.5)" />
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
 
-      {/* ===== FINAL CONTACT BUTTON ===== */}
-      <TouchableOpacity style={styles.contactButton} onPress={showContacts}>
-        <MaterialCommunityIcons name="phone-alert" size={22} color="#fff" />
-        <Text style={styles.contactButtonText}>
-          {isEnglish
-            ? 'Emergency & Advisors Contact'
-            : 'ہنگامی اور رہنمائی رابطہ'}
-        </Text>
-      </TouchableOpacity>
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
-/* ================= STYLES ================= */
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F0FFF4',
-    padding: 15,
-  },
-  toggleRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    marginBottom: 10,
-    marginTop:30
-  },
-  langText: {
-    marginRight: 8,
-    fontSize: 16,
-    color: '#2E8B57',
-  },
-  header: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#2E8B57',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
+  root: { flex: 1, backgroundColor: G.bg },
+
+  // Hero
+  hero: { paddingHorizontal: 20, paddingBottom: 20, overflow: 'hidden' },
+  heroDeco: { position: 'absolute', top: -30, right: -30, width: 120, height: 120, borderRadius: 60, backgroundColor: 'rgba(255,255,255,0.08)' },
+  heroRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 18 },
+  heroIconWrap: { width: 48, height: 48, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
+  heroTitle: { fontSize: 20, fontWeight: '800', color: '#fff', letterSpacing: -0.3 },
+  heroSub: { fontSize: 12, color: 'rgba(255,255,255,0.65)', marginTop: 2 },
+
+  // Lang toggle
+  langToggle: { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 14, padding: 4, gap: 4 },
+  langBtn: { flex: 1, paddingVertical: 8, borderRadius: 11, alignItems: 'center' },
+  langActive: { backgroundColor: '#fff' },
+  langText: { fontSize: 14, fontWeight: '700', color: 'rgba(255,255,255,0.75)' },
+
+  // Body
+  body: { paddingHorizontal: 16, marginTop: 20 },
+
+  // Cards
   card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 14,
+    backgroundColor: G.card,
+    borderRadius: 20,
     marginBottom: 14,
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
+    borderWidth: 1,
+    borderColor: G.border,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: { shadowColor: G.darkGreen, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.08, shadowRadius: 10 },
+      android: { elevation: 3 },
+    }),
   },
   cardHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    padding: 16,
+    gap: 12,
+  },
+  cardIconWrap: {
+    width: 40, height: 40, borderRadius: 13,
+    justifyContent: 'center', alignItems: 'center',
   },
   cardTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#2E8B57',
+    flex: 1, fontSize: 15, fontWeight: '700', color: G.text,
   },
-  content: {
-    marginTop: 10,
+  chevronWrap: {
+    width: 32, height: 32, borderRadius: 10,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center', alignItems: 'center',
   },
-  text: {
-    fontSize: 15,
-    lineHeight: 22,
-    marginBottom: 6,
-    color: '#2E4B36',
+
+  // Card content
+  cardContent: {
+    paddingHorizontal: 16, paddingBottom: 16,
+    borderTopWidth: 1, borderTopColor: G.border,
+    marginTop: 0, paddingTop: 14,
   },
-  contactButton: {
-    flexDirection: 'row',
-    backgroundColor: '#2E8B57',
-    padding: 14,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 10,
-    marginBottom: 20,
+  tipRow: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 10,
+    marginBottom: 10,
   },
-  contactButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
+  tipDot: {
+    width: 24, height: 24, borderRadius: 12,
+    backgroundColor: G.lightGreen,
+    justifyContent: 'center', alignItems: 'center',
+    marginTop: 1,
+  },
+  tipNum: {
+    fontSize: 11, fontWeight: '800', color: G.midGreen,
+  },
+  tipText: {
+    flex: 1, fontSize: 14, lineHeight: 21, color: '#374151',
+  },
+
+  // Contact Button
+  contactBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 10, padding: 18, borderRadius: 18,
+    ...Platform.select({
+      ios: { shadowColor: G.darkGreen, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 14 },
+      android: { elevation: 8 },
+    }),
+  },
+  contactText: {
+    color: '#fff', fontWeight: '800', fontSize: 15, flex: 1, textAlign: 'center',
   },
 });

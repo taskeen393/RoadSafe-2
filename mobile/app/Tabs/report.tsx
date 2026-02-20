@@ -1,4 +1,3 @@
-// app/tabs/report.tsx
 import { AntDesign, FontAwesome, Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -10,6 +9,7 @@ import {
   FlatList,
   Image,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -18,19 +18,32 @@ import {
   View,
 } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
-
-// Import services
-import { reportService, weatherService } from '../services';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { reportService } from '../services';
 import { ReportRequest } from '../services/types';
 
+// ─── Theme tokens ───
+const G = {
+  bg: '#F4F7F4',
+  card: '#FFFFFF',
+  darkGreen: '#1A4D2E',
+  midGreen: '#2D7A4D',
+  lightGreen: '#E8F5ED',
+  accent: '#E95B5B',
+  text: '#1A1A1A',
+  sub: '#6B7280',
+  border: '#D1E8D9',
+  inputBg: '#F9FBFA',
+};
+
+
 export default function ReportScreen({ navigation }: any) {
-  const [user, setUser] = useState<string>('');
+  const insets = useSafeAreaInsets();
+  const [user, setUser] = useState('');
   const [location, setLocation] = useState('');
   const [lat, setLat] = useState<number | null>(null);
   const [lon, setLon] = useState<number | null>(null);
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
-  const [locationError, setLocationError] = useState<string | null>(null);
-
   const [textInput, setTextInput] = useState('');
   const [selectedImages, setSelectedImages] = useState<string[]>([]);
   const [selectedVideos, setSelectedVideos] = useState<string[]>([]);
@@ -38,201 +51,104 @@ export default function ReportScreen({ navigation }: any) {
   const [mapCoords, setMapCoords] = useState<{ lat: number; lon: number } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // ✅ AUTH CHECK ON LOAD
+  // Incident type selection
+  const incidentTypes = [
+    { label: 'Accident', icon: 'car-crash', color: '#E95B5B' },
+    { label: 'Flood', icon: 'water', color: '#3B9EE8' },
+    { label: 'Landslide', icon: 'terrain', color: '#8B5CF6' },
+    { label: 'Roadblock', icon: 'barrier', color: '#F59E0B' },
+    { label: 'Other', icon: 'alert-circle-outline', color: '#6B7280' },
+  ];
+  const [selectedType, setSelectedType] = useState('');
+
   useEffect(() => {
     const checkAuth = async () => {
       const token = await SecureStore.getItemAsync('token');
-      if (!token) {
-        navigation.replace('login');
-      } else {
+      if (!token) navigation?.replace?.('login');
+      else {
         const userStr = await SecureStore.getItemAsync('user');
         if (userStr) setUser(JSON.parse(userStr).name);
       }
     };
     checkAuth();
+    getLocation();
   }, []);
+
   const getLocation = async () => {
     try {
       setIsFetchingLocation(true);
-
       const { status } = await Location.requestForegroundPermissionsAsync();
-      console.log('✅ Location permission status:', status);
-      const enabled = await Location.hasServicesEnabledAsync();
-console.log('Location services enabled:', enabled);
-      if (status !== 'granted') {
-        setLocationError('Permission denied');
-        Alert.alert('Permission denied', 'Please enable location permission in your device settings.');
-        return;
-      }
-
+      if (status !== 'granted') return;
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
       const { latitude, longitude } = loc.coords;
-
-      console.log('✅ Location fetched:', latitude, longitude);
-      setLat(latitude);
-      setLon(longitude);
-
-      const reverse = await Location.reverseGeocodeAsync({ latitude, longitude });
-      console.log('✅ Reverse geocoded:', reverse);
-      const locStr = reverse[0]
-        ? `${reverse[0].name}, ${reverse[0].city}, ${reverse[0].country}`
-        : `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`;
-      console.log('✅ Location string:', locStr);
-      setLocation(locStr);
-    } catch (err) {
-      console.log('❌ Location fetch error:', err);
+      setLat(latitude); setLon(longitude);
+      const rev = await Location.reverseGeocodeAsync({ latitude, longitude });
+      setLocation(rev[0] ? `${rev[0].name}, ${rev[0].city}` : `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+    } catch {
       Alert.alert('Error', 'Failed to fetch location');
-      setLocationError('Failed to fetch location');
     } finally {
       setIsFetchingLocation(false);
     }
   };
 
-
-  useEffect(() => {
-    getLocation();
-  }, []);
-
-  // 📷 Pick Images / Camera
   const pickImages = async () => {
-    Alert.alert(
-      'Upload Image',
-      'Choose option',
-      [
-        {
-          text: 'Camera',
-          onPress: async () => {
-            let result = await ImagePicker.launchCameraAsync({
-              mediaTypes: ImagePicker.MediaTypeOptions.Images,
-              quality: 0.6,
-            });
-            if (!result.canceled && result.assets?.length) {
-              const uris = result.assets.map(a => a.uri);
-              setSelectedImages(prev => [...prev, ...uris]);
-            }
-          },
-        },
-        {
-          text: 'Gallery',
-          onPress: async () => {
-            let result = await ImagePicker.launchImageLibraryAsync({
-              mediaTypes: ImagePicker.MediaTypeOptions.Images,
-              quality: 0.6,
-              allowsMultipleSelection: true as any,
-            });
-            if (!result.canceled && result.assets?.length) {
-              const uris = result.assets.map(a => a.uri);
-              setSelectedImages(prev => [...prev, ...uris]);
-            }
-          },
-        },
-        { text: 'Cancel', style: 'cancel' },
-      ]
-    );
+    Alert.alert('Upload Image', 'Choose option', [
+      {
+        text: 'Camera', onPress: async () => {
+          const r = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.6 });
+          if (!r.canceled) setSelectedImages(p => [...p, ...r.assets.map(a => a.uri)]);
+        }
+      },
+      {
+        text: 'Gallery', onPress: async () => {
+          const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.6, allowsMultipleSelection: true as any });
+          if (!r.canceled) setSelectedImages(p => [...p, ...r.assets.map(a => a.uri)]);
+        }
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   };
 
-  // 🎬 Pick Videos / Camera
   const pickVideos = async () => {
-    Alert.alert(
-      'Upload Video',
-      'Choose option',
-      [
-        {
-          text: 'Camera',
-          onPress: async () => {
-            let result = await ImagePicker.launchCameraAsync({
-              mediaTypes: ImagePicker.MediaTypeOptions.Videos,
-            });
-            if (!result.canceled && result.assets?.length) {
-              const uris = result.assets.map(a => a.uri);
-              setSelectedVideos(prev => [...prev, ...uris]);
-            }
-          },
-        },
-        {
-          text: 'Gallery',
-          onPress: async () => {
-            let result = await ImagePicker.launchImageLibraryAsync({
-              mediaTypes: ImagePicker.MediaTypeOptions.Videos,
-              allowsMultipleSelection: true as any,
-            });
-            if (!result.canceled && result.assets?.length) {
-              const uris = result.assets.map(a => a.uri);
-              setSelectedVideos(prev => [...prev, ...uris]);
-            }
-          },
-        },
-        { text: 'Cancel', style: 'cancel' },
-      ]
-    );
+    Alert.alert('Upload Video', 'Choose option', [
+      {
+        text: 'Camera', onPress: async () => {
+          const r = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Videos });
+          if (!r.canceled) setSelectedVideos(p => [...p, ...r.assets.map(a => a.uri)]);
+        }
+      },
+      {
+        text: 'Gallery', onPress: async () => {
+          const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Videos, allowsMultipleSelection: true as any });
+          if (!r.canceled) setSelectedVideos(p => [...p, ...r.assets.map(a => a.uri)]);
+        }
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   };
 
-  // ✅ Submit report using reportService
   const submitReport = async () => {
-    // If location isn't ready yet, retry once to avoid a "stuck" UX
-    if (lat === null || lon === null) {
-      await getLocation();
-      // Wait a bit for location to be set
-      await new Promise(resolve => setTimeout(resolve, 500));
-    }
-
     if (!textInput.trim() && selectedImages.length === 0 && selectedVideos.length === 0) {
-      Alert.alert('Add something', 'Please add text, image or video before submitting.');
-      return;
+      return Alert.alert('Add something', 'Please add text, image or video before submitting.');
     }
-
     const token = await SecureStore.getItemAsync('token');
     if (!token) return Alert.alert('Not logged in');
-
     setIsSubmitting(true);
 
-    // Ensure location is set - use coordinates if location string is empty
-    let safeLocation = location;
-    if (!safeLocation || safeLocation.trim() === '' || safeLocation === 'Unknown location') {
-      if (lat !== null && lon !== null) {
-        safeLocation = `${lat.toFixed(4)}, ${lon.toFixed(4)}`;
-      } else {
-        safeLocation = 'Unknown location';
-      }
-    }
-    const safeLat = lat ?? 0;
-    const safeLon = lon ?? 0;
-
+    const safeLocation = location || (lat ? `${lat.toFixed(4)}, ${lon?.toFixed(4)}` : 'Unknown location');
     const reportData: ReportRequest = {
-      user,
-      location: safeLocation,
-      lat: safeLat,
-      lon: safeLon,
-      title: textInput.slice(0, 30) || 'No title',
+      user, location: safeLocation, lat: lat ?? 0, lon: lon ?? 0,
+      title: (selectedType ? `[${selectedType}] ` : '') + (textInput.slice(0, 40) || 'No title'),
       description: textInput || 'No description',
-      imageUris: selectedImages,
-      videoUris: selectedVideos,
+      imageUris: selectedImages, videoUris: selectedVideos,
       dateTime: new Date().toISOString(),
     };
 
-    if (__DEV__) {
-      console.log('📤 Submitting report:', {
-        location: safeLocation,
-        lat: safeLat,
-        lon: safeLon,
-        hasLocation: !!location,
-        locationState: location,
-        imageCount: selectedImages.length,
-        videoCount: selectedVideos.length,
-        selectedImages: selectedImages,
-        selectedVideos: selectedVideos,
-      });
-    }
-
     try {
       await reportService.submitReport(reportData);
-
-      setTextInput('');
-      setSelectedImages([]);
-      setSelectedVideos([]);
-      Alert.alert('Success', 'Your report has been added!');
+      setTextInput(''); setSelectedImages([]); setSelectedVideos([]); setSelectedType('');
+      Alert.alert('✅ Submitted', 'Your report has been sent successfully!');
     } catch (err: any) {
-      console.log('Report submit error:', err);
       Alert.alert('Error', err.msg || 'Failed to submit report');
     } finally {
       setIsSubmitting(false);
@@ -240,82 +156,154 @@ console.log('Location services enabled:', enabled);
   };
 
   return (
-    <LinearGradient colors={['#E8F5E9', '#F9FFF9']} style={styles.container}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 120 }}>
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <AntDesign name="alert" size={28} color="#2E8B57" style={{ marginRight: 8 }} />
-            <Text style={styles.title}>Report Incident</Text>
-          </View>
+    <View style={[styles.screen, { paddingTop: insets.top }]}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={{ paddingBottom: 120 }}>
 
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
-            <FontAwesome name="map-marker" size={18} color="#2E8B57" style={{ marginRight: 5 }} />
-            <Text style={styles.locationText}>
-              Your Location:{' '}
-              {location
-                ? location
-                : isFetchingLocation
-                  ? 'Fetching...'
-                  : locationError
-                    ? 'Unavailable'
-                    : 'Fetching...'}
-            </Text>
+        {/* ─── Hero Header ─── */}
+        <LinearGradient colors={[G.darkGreen, G.midGreen]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.hero, { paddingTop: insets.top + 16 }]}>
+          {/* Decorative circles */}
+          <View style={styles.heroDeco1} />
+          <View style={styles.heroDeco2} />
+
+          <View style={styles.heroContent}>
+            <View style={styles.heroIconWrap}>
+              <Ionicons name="warning" size={26} color="#fff" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.heroTitle}>Report Incident</Text>
+              <View style={styles.locationRow}>
+                <Ionicons name="location" size={13} color="rgba(255,255,255,0.7)" />
+                <Text style={styles.locationText} numberOfLines={1}>
+                  {location || (isFetchingLocation ? 'Getting location...' : 'Location unavailable')}
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity style={styles.locRefreshBtn} onPress={getLocation}>
+              <Ionicons name="refresh" size={16} color="#fff" />
+            </TouchableOpacity>
           </View>
+        </LinearGradient>
+
+        {/* ─── Incident Type Pills ─── */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Incident Type</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
+            {incidentTypes.map((t) => (
+              <TouchableOpacity
+                key={t.label}
+                style={[styles.typePill, selectedType === t.label && { backgroundColor: t.color, borderColor: t.color }]}
+                onPress={() => setSelectedType(selectedType === t.label ? '' : t.label)}
+              >
+                <Ionicons name={t.icon as any} size={14} color={selectedType === t.label ? '#fff' : G.sub} />
+                <Text style={[styles.typePillText, selectedType === t.label && { color: '#fff' }]}>{t.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
         </View>
 
-        {/* Report Form */}
-        <View style={styles.card}>
+        {/* ─── Description ─── */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Description</Text>
           <TextInput
-            style={styles.input}
+            style={styles.descInput}
             placeholder="Describe what happened..."
+            placeholderTextColor={G.sub}
             value={textInput}
             onChangeText={setTextInput}
             multiline
+            textAlignVertical="top"
+            numberOfLines={5}
           />
+        </View>
 
-          <TouchableOpacity style={styles.button} onPress={pickImages}>
-            <Ionicons name="images-sharp" size={20} color="#2E8B57" style={{ marginRight: 5 }} />
-            <Text style={styles.buttonText}>Upload Image</Text>
-          </TouchableOpacity>
+        {/* ─── Media Upload ─── */}
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Attach Media</Text>
 
+          <View style={styles.mediaRow}>
+            {/* Images */}
+            <TouchableOpacity style={styles.mediaBtn} onPress={pickImages} activeOpacity={0.8}>
+              <View style={[styles.mediaBtnIcon, { backgroundColor: '#E8F5ED' }]}>
+                <Ionicons name="images" size={22} color={G.midGreen} />
+              </View>
+              <Text style={styles.mediaBtnLabel}>Photos</Text>
+              {selectedImages.length > 0 && (
+                <View style={styles.mediaBadge}>
+                  <Text style={styles.mediaBadgeText}>{selectedImages.length}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            {/* Videos */}
+            <TouchableOpacity style={styles.mediaBtn} onPress={pickVideos} activeOpacity={0.8}>
+              <View style={[styles.mediaBtnIcon, { backgroundColor: '#FEF3C7' }]}>
+                <AntDesign name="video-camera" size={22} color="#D97706" />
+              </View>
+              <Text style={styles.mediaBtnLabel}>Videos</Text>
+              {selectedVideos.length > 0 && (
+                <View style={[styles.mediaBadge, { backgroundColor: '#D97706' }]}>
+                  <Text style={styles.mediaBadgeText}>{selectedVideos.length}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          {/* Image Thumbnails */}
           {selectedImages.length > 0 && (
             <FlatList
               data={selectedImages}
               horizontal
               keyExtractor={(uri) => uri}
               showsHorizontalScrollIndicator={false}
-              renderItem={({ item }) => <Image source={{ uri: item }} style={styles.selectedThumb} />}
-              style={{ marginVertical: 8 }}
+              contentContainerStyle={{ gap: 10, marginTop: 12 }}
+              renderItem={({ item, index }) => (
+                <View style={styles.thumbWrap}>
+                  <Image source={{ uri: item }} style={styles.thumb} />
+                  <TouchableOpacity
+                    style={styles.thumbRemove}
+                    onPress={() => setSelectedImages(p => p.filter((_, i) => i !== index))}
+                  >
+                    <Ionicons name="close-circle" size={20} color="#fff" />
+                  </TouchableOpacity>
+                </View>
+              )}
             />
           )}
 
-          <TouchableOpacity style={styles.button} onPress={pickVideos}>
-            <AntDesign name="video-camera-add" size={20} color="#2E8B57" style={{ marginRight: 5 }} />
-            <Text style={styles.buttonText}>Upload Video</Text>
-          </TouchableOpacity>
-
           {selectedVideos.length > 0 && (
-            <View style={{ marginTop: 8, marginBottom: 4, flexDirection: 'row', alignItems: 'center' }}>
-              <Ionicons name="checkmark-done-circle-sharp" size={18} color="#2E7D32" style={{ marginRight: 5 }} />
-              <Text style={styles.selectedText}>{selectedVideos.length} video(s) selected</Text>
+            <View style={styles.videoRow}>
+              <Ionicons name="checkmark-circle" size={16} color={G.midGreen} />
+              <Text style={styles.videoText}>{selectedVideos.length} video{selectedVideos.length > 1 ? 's' : ''} selected</Text>
             </View>
           )}
+        </View>
 
-          <TouchableOpacity
-            style={[styles.submitButton, isSubmitting && { opacity: 0.7 }]}
-            onPress={submitReport}
-            disabled={isSubmitting}
-          >
-            <Ionicons name="checkmark-done-circle-sharp" size={20} color="#fff" style={{ marginRight: 5 }} />
-            <Text style={styles.submitButtonText}>
-              {isSubmitting ? 'Submitting...' : 'Submit Report'}
-            </Text>
+        {/* ─── Submit Button ─── */}
+        <View style={{ paddingHorizontal: 20, marginTop: 8 }}>
+          <TouchableOpacity onPress={submitReport} disabled={isSubmitting} activeOpacity={0.88}>
+            <LinearGradient
+              colors={isSubmitting ? ['#9CA3AF', '#6B7280'] : [G.darkGreen, G.midGreen]}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+              style={styles.submitBtn}
+            >
+              {isSubmitting ? (
+                <Text style={styles.submitText}>Submitting...</Text>
+              ) : (
+                <>
+                  <Ionicons name="paper-plane" size={20} color="#fff" />
+                  <Text style={styles.submitText}>Submit Report</Text>
+                </>
+              )}
+            </LinearGradient>
           </TouchableOpacity>
         </View>
+
       </ScrollView>
 
-      {/* MAP MODAL */}
+      {/* Map Modal */}
       <Modal visible={mapVisible} animationType="slide" transparent={false}>
         <View style={{ flex: 1 }}>
           <MapView
@@ -323,73 +311,194 @@ console.log('Location services enabled:', enabled);
             initialRegion={{
               latitude: mapCoords?.lat || 24.8607,
               longitude: mapCoords?.lon || 67.0011,
-              latitudeDelta: 0.05,
-              longitudeDelta: 0.05,
+              latitudeDelta: 0.05, longitudeDelta: 0.05,
             }}
           >
             {mapCoords && <Marker coordinate={{ latitude: mapCoords.lat, longitude: mapCoords.lon }} title="Reported Location" />}
           </MapView>
-
           <TouchableOpacity style={styles.closeMapBtn} onPress={() => setMapVisible(false)}>
-            <Text style={styles.closeMapText}>✖ Close Map</Text>
+            <Text style={styles.closeMapText}>✖  Close Map</Text>
           </TouchableOpacity>
         </View>
       </Modal>
-    </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, paddingHorizontal: 15, marginTop: 50, marginBottom: 0 },
-  header: { alignItems: 'center', marginBottom: 15 },
-  title: { fontSize: 28, fontWeight: 'bold', color: '#2E8B57' },
-  locationText: { fontSize: 14, color: '#336B48' },
-
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 25,
-    padding: 20,
-    shadowColor: '#2E8B57',
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 5,
-    marginBottom: 15,
+  screen: {
+    flex: 1,
+    backgroundColor: G.bg,
   },
-  input: {
-    backgroundColor: '#F0FFF0',
-    borderRadius: 15,
-    padding: 15,
+
+  // ─── Hero ───
+  hero: {
+    paddingHorizontal: 20,
+    paddingVertical: 24,
+    overflow: 'hidden',
+  },
+  heroDeco1: {
+    position: 'absolute', top: -30, right: -30,
+    width: 120, height: 120, borderRadius: 60,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  heroDeco2: {
+    position: 'absolute', bottom: -40, right: 60,
+    width: 160, height: 160, borderRadius: 80,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  heroContent: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+  },
+  heroIconWrap: {
+    width: 50, height: 50, borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  heroTitle: {
+    fontSize: 20, fontWeight: '800', color: '#fff', letterSpacing: -0.3,
+  },
+  locationRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4,
+  },
+  locationText: {
+    fontSize: 12, color: 'rgba(255,255,255,0.7)', flex: 1,
+  },
+  locRefreshBtn: {
+    width: 34, height: 34, borderRadius: 17,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    justifyContent: 'center', alignItems: 'center',
+  },
+
+  // ─── Sections ───
+  section: {
+    paddingHorizontal: 20,
+    marginTop: 22,
+  },
+  sectionLabel: {
+    fontSize: 14, fontWeight: '700', color: G.text,
+    marginBottom: 12, letterSpacing: -0.1,
+  },
+
+  // ─── Type Pills ───
+  typePill: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 14, paddingVertical: 9,
+    borderRadius: 20, borderWidth: 1.5,
+    backgroundColor: G.card, borderColor: G.border,
+  },
+  typePillText: {
+    fontSize: 13, fontWeight: '600', color: G.sub,
+  },
+
+  // ─── Floating Input ───
+  inputWrapper: {
+    backgroundColor: G.inputBg,
+    borderRadius: 16, borderWidth: 1.5,
+    borderColor: G.border,
+    paddingHorizontal: 16, paddingTop: 24, paddingBottom: 12,
+  },
+  inputWrapperFocused: {
+    borderColor: G.midGreen,
+    backgroundColor: '#fff',
+    ...Platform.select({
+      ios: { shadowColor: G.midGreen, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 10 },
+      android: { elevation: 3 },
+    }),
+  },
+  floatLabel: {
+    position: 'absolute', left: 16, fontWeight: '500',
+  },
+  floatInput: {
+    fontSize: 15, color: G.text, paddingVertical: 0, marginTop: 4,
+  },
+
+  // ─── Media ───
+  mediaRow: {
+    flexDirection: 'row', gap: 14,
+  },
+  mediaBtn: {
+    flex: 1, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: G.card, borderRadius: 18,
+    paddingVertical: 20, borderWidth: 1, borderColor: G.border,
+    borderStyle: 'dashed',
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8 },
+      android: { elevation: 2 },
+    }),
+  },
+  mediaBtnIcon: {
+    width: 48, height: 48, borderRadius: 14,
+    justifyContent: 'center', alignItems: 'center', marginBottom: 8,
+  },
+  mediaBtnLabel: {
+    fontSize: 13, fontWeight: '600', color: G.sub,
+  },
+  mediaBadge: {
+    position: 'absolute', top: 8, right: 12,
+    backgroundColor: G.midGreen, borderRadius: 10,
+    minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 5,
+  },
+  mediaBadgeText: {
+    fontSize: 11, fontWeight: '700', color: '#fff',
+  },
+
+  // Thumbs
+  thumbWrap: { position: 'relative' },
+  thumb: {
+    width: 90, height: 90, borderRadius: 14,
+  },
+  thumbRemove: {
+    position: 'absolute', top: -6, right: -6,
+    backgroundColor: G.accent, borderRadius: 12,
+  },
+  videoRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12,
+    backgroundColor: G.lightGreen, padding: 10, borderRadius: 12,
+  },
+  videoText: {
+    fontSize: 13, fontWeight: '600', color: G.midGreen,
+  },
+
+  // ─── Submit ───
+  submitBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 10, borderRadius: 18, paddingVertical: 18,
+    ...Platform.select({
+      ios: { shadowColor: G.darkGreen, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 14 },
+      android: { elevation: 8 },
+    }),
+  },
+  submitText: {
+    fontSize: 16, fontWeight: '800', color: '#fff', letterSpacing: 0.2,
+  },
+
+  // ─── Map modal ───
+  closeMapBtn: {
+    position: 'absolute', bottom: 40, alignSelf: 'center',
+    backgroundColor: G.darkGreen, paddingVertical: 12,
+    paddingHorizontal: 28, borderRadius: 24,
+  },
+  closeMapText: {
+    color: '#fff', fontWeight: '700', fontSize: 15,
+  },
+
+  // Description input
+  descInput: {
+    backgroundColor: G.card,
+    borderWidth: 1.5,
+    borderColor: G.border,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     fontSize: 15,
-    minHeight: 80,
+    color: G.text,
+    minHeight: 120,
     textAlignVertical: 'top',
-    marginBottom: 15,
-    borderWidth: 1,
-    borderColor: '#A5D6A7',
+    ...Platform.select({
+      ios: { shadowColor: G.midGreen, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8 },
+      android: { elevation: 2 },
+    }),
   },
-  button: {
-    flexDirection: 'row',
-    backgroundColor: '#E6F4EA',
-    padding: 14,
-    borderRadius: 15,
-    alignItems: 'center',
-    marginVertical: 6,
-  },
-  buttonText: { fontSize: 16, fontWeight: '600', color: '#2E8B57' },
-  submitButton: {
-    flexDirection: 'row',
-    backgroundColor: '#2E8B57',
-    padding: 14,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 10,
-  },
-  submitButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-
-  selectedThumb: { width: 110, height: 110, borderRadius: 12, marginRight: 8 },
-  selectedText: { fontSize: 14, color: '#2E7D32', fontWeight: '600' },
-
-  closeMapBtn: { position: 'absolute', bottom: 40, alignSelf: 'center', backgroundColor: '#2E8B57', paddingVertical: 10, paddingHorizontal: 25, borderRadius: 25 },
-  closeMapText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
 });

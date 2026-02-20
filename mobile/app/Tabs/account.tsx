@@ -29,17 +29,28 @@ export default function AccountScreen() {
   const [image, setImage] = useState<string | null>(null);
   const [editingImage, setEditingImage] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [imageError, setImageError] = useState(false);
+
+  // Helper to validate a profile image URL
+  const isValidImage = (url: string | undefined | null): boolean => {
+    return !!url && url !== 'null' && url !== 'undefined' && url.startsWith('http');
+  };
 
   // Load profile image from user object or SecureStore (fallback)
   useEffect(() => {
+    setImageError(false);
     (async () => {
       // First try to get from user object (from backend)
-      if (user?.profileImage) {
-        setImage(user.profileImage);
+      if (isValidImage(user?.profileImage)) {
+        setImage(user!.profileImage!);
       } else {
         // Fallback to SecureStore for backwards compatibility
         const saved = await SecureStore.getItemAsync("profileImage");
-        if (saved) setImage(saved);
+        if (saved && isValidImage(saved)) {
+          setImage(saved);
+        } else {
+          setImage(null);
+        }
       }
     })();
   }, [user]);
@@ -101,7 +112,7 @@ export default function AccountScreen() {
         setImage(result.user.profileImage);
         // Also save to SecureStore for backwards compatibility
         await SecureStore.setItemAsync("profileImage", result.user.profileImage);
-        
+
         // Update AuthContext with new user data
         await refreshUser();
       }
@@ -139,8 +150,12 @@ export default function AccountScreen() {
           <Text style={styles.heading}>My Account</Text>
 
           {/* Profile Image */}
-          {image ? (
-            <Image source={{ uri: image }} style={styles.avatar} />
+          {image && !imageError ? (
+            <Image
+              source={{ uri: image }}
+              style={styles.avatar}
+              onError={() => setImageError(true)}
+            />
           ) : (
             <Ionicons name="person-circle-outline" size={130} color="#2E8B57" />
           )}
@@ -177,8 +192,8 @@ export default function AccountScreen() {
                 </TouchableOpacity>
               </View>
 
-              <TouchableOpacity 
-                style={[styles.saveBtn, isUploading && { opacity: 0.7 }]} 
+              <TouchableOpacity
+                style={[styles.saveBtn, isUploading && { opacity: 0.7 }]}
                 onPress={saveImage}
                 disabled={isUploading}
               >
@@ -209,37 +224,40 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: "#fff",
-    borderRadius: 25,
+    borderRadius: 20,
     paddingVertical: 30,
     paddingHorizontal: 25,
-    width: width * 0.95,
+    width: width * 0.92,
     alignItems: "center",
-    elevation: 5,
-    shadowColor: "#2E8B57",
-    shadowOpacity: 0.2,
-    shadowRadius: 15,
+    shadowColor: '#2D7A4D',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
     marginBottom: 20,
-    marginTop: 50
+    marginTop: 50,
   },
   heading: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#2E8B57",
+    fontSize: 26,
+    fontWeight: "700",
+    color: "#1A1A2E",
     marginBottom: 20,
   },
   avatar: {
-    width: 130,
-    height: 130,
-    borderRadius: 65,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
     marginBottom: 15,
+    borderWidth: 3,
+    borderColor: '#2D7A4D',
   },
   uploadBtn: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#2E8B57",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 20,
+    backgroundColor: "#2D7A4D",
+    paddingVertical: 12,
+    paddingHorizontal: 22,
+    borderRadius: 25,
     marginBottom: 20,
   },
   uploadText: {
@@ -252,32 +270,34 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   label: {
-    color: "#336B48",
-    fontSize: 14,
-    fontWeight: "bold",
-    marginTop: 10,
+    color: "#9CA3AF",
+    fontSize: 12,
+    fontWeight: "600",
+    marginTop: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   value: {
-    color: "#2E8B57",
-    fontSize: 18,
+    color: "#1A1A2E",
+    fontSize: 17,
     fontWeight: "600",
     marginTop: 4,
   },
   preview: {
-    width: width * 0.85,
-    height: width * 0.85,
-    borderRadius: 15,
+    width: width * 0.82,
+    height: width * 0.82,
+    borderRadius: 16,
     marginVertical: 15,
   },
   editorRow: { flexDirection: "row", gap: 10, marginBottom: 10 },
   editorBtn: {
     flexDirection: "row",
-    backgroundColor: "#2E8B57",
+    backgroundColor: "#2D7A4D",
     padding: 12,
-    borderRadius: 12,
+    borderRadius: 14,
     alignItems: "center",
   },
-  btnText: { color: "#fff", marginLeft: 5 },
+  btnText: { color: "#fff", marginLeft: 5, fontWeight: '600' },
   saveBtn: {
     backgroundColor: "#1B5E20",
     paddingVertical: 14,
@@ -288,10 +308,10 @@ const styles = StyleSheet.create({
   saveText: { color: "#fff", fontSize: 16, fontWeight: "bold" },
   logoutBtn: {
     flexDirection: "row",
-    backgroundColor: "#2E8B57",
+    backgroundColor: "#EF4444",
     paddingVertical: 14,
     paddingHorizontal: 35,
-    borderRadius: 20,
+    borderRadius: 25,
     alignItems: "center",
   },
   logoutText: { color: "#fff", fontSize: 16, fontWeight: "bold", marginLeft: 6 },

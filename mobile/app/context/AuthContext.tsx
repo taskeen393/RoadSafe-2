@@ -1,6 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { authService } from '../services';
+import { userService } from '../services';
 import { User } from '../services/types';
 
 interface AuthContextType {
@@ -56,6 +57,16 @@ export const AuthProvider = ({ children }: any) => {
 
   const refreshUser = async () => {
     try {
+      // Try to get fresh data from backend first (includes latest profileImage)
+      try {
+        const { user: freshUser } = await userService.getProfile();
+        if (freshUser) {
+          setUser(freshUser);
+          return;
+        }
+      } catch {
+        // Fall back to SecureStore if backend request fails
+      }
       const storedUser = await authService.getCurrentUser();
       setUser(storedUser);
     } catch (error) {

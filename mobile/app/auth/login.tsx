@@ -1,7 +1,8 @@
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   Alert,
+  Animated,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,11 +12,89 @@ import {
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-
-// Import auth service and context
 import { authService } from '../services';
 import { useAuth } from '../context/AuthContext';
+import { COLORS, FONT, FONT_SIZE, RADIUS, SHADOWS, SPACING } from '../../constants/globalStyles';
 
+// ─── Floating Label Input Component ───
+function FloatingInput({
+  label,
+  value,
+  onChangeText,
+  secureTextEntry,
+  keyboardType,
+  autoCapitalize,
+}: {
+  label: string;
+  value: string;
+  onChangeText: (t: string) => void;
+  secureTextEntry?: boolean;
+  keyboardType?: any;
+  autoCapitalize?: any;
+}) {
+  const [focused, setFocused] = useState(false);
+  const labelAnim = useRef(new Animated.Value(value ? 1 : 0)).current;
+
+  const handleFocus = () => {
+    setFocused(true);
+    Animated.timing(labelAnim, {
+      toValue: 1,
+      duration: 180,
+      useNativeDriver: false,
+    }).start();
+  };
+
+  const handleBlur = () => {
+    setFocused(false);
+    if (!value) {
+      Animated.timing(labelAnim, {
+        toValue: 0,
+        duration: 180,
+        useNativeDriver: false,
+      }).start();
+    }
+  };
+
+  const labelTop = labelAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [16, 4],
+  });
+  const labelSize = labelAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [16, 12],
+  });
+
+  return (
+    <View
+      style={[
+        styles.floatingWrapper,
+        focused && styles.floatingWrapperFocused,
+      ]}
+    >
+      <Animated.Text
+        style={[
+          styles.floatingLabel,
+          { top: labelTop, fontSize: labelSize },
+          focused && { color: COLORS.emerald },
+        ]}
+      >
+        {label}
+      </Animated.Text>
+      <TextInput
+        style={styles.floatingInput}
+        value={value}
+        onChangeText={onChangeText}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
+        secureTextEntry={secureTextEntry}
+        keyboardType={keyboardType}
+        autoCapitalize={autoCapitalize}
+      />
+    </View>
+  );
+}
+
+// ─── Login Screen ───
 export default function Login() {
   const router = useRouter();
   const { login: loginContext } = useAuth();
@@ -30,28 +109,16 @@ export default function Login() {
     }
 
     setLoading(true);
-
     try {
-      console.log(email, password);
       const response = await authService.login({ email, password });
-
-      console.log(response);
-      // Transform backend response (id -> _id) to match frontend types
       const user = {
         _id: response.user._id,
         name: response.user.name,
         email: response.user.email,
       };
-
-      // ✅ Save token & user using authService
       await authService.saveAuthCredentials(response.token, user);
-      
-      // ✅ Update AuthContext
       await loginContext(response.token, user);
-
-      // ✅ Direct to dashboard
       router.replace('/Tabs');
-
     } catch (error: any) {
       Alert.alert(
         'Login failed',
@@ -63,128 +130,171 @@ export default function Login() {
   };
 
   return (
-    <LinearGradient colors={['#E8F5E9', '#F9FFF9']} style={styles.gradient}>
-      <ScrollView contentContainerStyle={styles.container}>
-        {/* Logo Section */}
+    <LinearGradient colors={[COLORS.bgScreen, '#E8F5E9']} style={styles.gradient}>
+      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+        {/* Logo */}
         <View style={styles.logoContainer}>
           <View style={styles.logoCircle}>
-            <MaterialCommunityIcons name="shield-check" size={60} color="#2E8B57" />
+            <MaterialCommunityIcons name="shield-check" size={50} color={COLORS.emerald} />
           </View>
           <Text style={styles.appName}>RoadSafe</Text>
           <Text style={styles.tagline}>Stay Safe, Stay Connected</Text>
         </View>
 
-        <Text style={styles.title}>Login</Text>
+        {/* Card */}
+        <View style={styles.formCard}>
+          <Text style={styles.formTitle}>Welcome Back</Text>
+          <Text style={styles.formSubtitle}>Sign in to your account</Text>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Email"
-        value={email}
-        onChangeText={setEmail}
-        autoCapitalize="none"
-        keyboardType="email-address"
-      />
+          <FloatingInput
+            label="Email"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
+          <FloatingInput
+            label="Password"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+          />
 
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-      />
+          <TouchableOpacity
+            onPress={handleLogin}
+            disabled={loading}
+            activeOpacity={0.85}
+          >
+            <LinearGradient
+              colors={COLORS.gradientEmerald}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={[styles.loginBtn, loading && { opacity: 0.7 }]}
+            >
+              <Text style={styles.loginBtnText}>
+                {loading ? 'Logging in...' : 'Login'}
+              </Text>
+            </LinearGradient>
+          </TouchableOpacity>
 
-      <TouchableOpacity
-        style={[styles.button, loading && { opacity: 0.7 }]}
-        onPress={handleLogin}
-        disabled={loading}
-      >
-        <Text style={styles.buttonText}>
-          {loading ? 'Logging in...' : 'Login'}
-        </Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity onPress={() => router.push('./Signup')}>
-        <Text style={styles.linkText}>
-          Don't have an account? Sign Up
-        </Text>
-      </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => router.push('./Signup')}
+            style={styles.linkRow}
+          >
+            <Text style={styles.linkText}>
+              Don't have an account?{' '}
+              <Text style={styles.linkBold}>Sign Up</Text>
+            </Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
-  gradient: {
-    flex: 1,
-  },
+  gradient: { flex: 1 },
   container: {
     flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: SPACING.xl,
   },
-  logoContainer: {
-    alignItems: 'center',
-    marginBottom: 30,
-  },
+
+  // Logo
+  logoContainer: { alignItems: 'center', marginBottom: SPACING.xxxl },
   logoCircle: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: '#fff',
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: COLORS.bgCard,
     justifyContent: 'center',
     alignItems: 'center',
-    elevation: 5,
-    shadowColor: '#2E8B57',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    marginBottom: 15,
+    ...SHADOWS.cardHeavy,
+    marginBottom: SPACING.lg,
   },
   appName: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#2E8B57',
-    marginTop: 10,
+    fontSize: FONT_SIZE.hero,
+    fontWeight: FONT.extraBold,
+    color: COLORS.emerald,
   },
   tagline: {
-    fontSize: 14,
-    color: '#4E944F',
-    marginTop: 5,
-    fontStyle: 'italic',
+    fontSize: FONT_SIZE.small,
+    color: COLORS.textSecondary,
+    marginTop: SPACING.xs,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    color: '#2E8B57',
-  },
-  input: {
+
+  // Form Card
+  formCard: {
     width: '100%',
-    borderWidth: 1,
-    borderColor: '#A5D6A7',
-    backgroundColor: '#F0FFF0',
-    padding: 12,
-    marginBottom: 15,
-    borderRadius: 10,
+    backgroundColor: COLORS.bgCard,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.xxl,
+    ...SHADOWS.card,
   },
-  button: {
-    backgroundColor: '#2E8B57',
-    padding: 15,
-    width: '100%',
-    borderRadius: 10,
+  formTitle: {
+    fontSize: FONT_SIZE.title,
+    fontWeight: FONT.bold,
+    color: COLORS.textPrimary,
+    marginBottom: SPACING.xs,
+  },
+  formSubtitle: {
+    fontSize: FONT_SIZE.body,
+    color: COLORS.textSecondary,
+    marginBottom: SPACING.xxl,
+  },
+
+  // Floating Input
+  floatingWrapper: {
+    backgroundColor: COLORS.bgInput,
+    borderRadius: RADIUS.md,
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.xl,
+    paddingBottom: SPACING.sm,
+    marginBottom: SPACING.lg,
+    position: 'relative',
+  },
+  floatingWrapperFocused: {
+    borderColor: COLORS.emerald,
+    backgroundColor: '#FAFFF9',
+  },
+  floatingLabel: {
+    position: 'absolute',
+    left: SPACING.lg,
+    color: COLORS.textSecondary,
+    fontWeight: FONT.medium,
+  },
+  floatingInput: {
+    fontSize: FONT_SIZE.bodyLg,
+    color: COLORS.textPrimary,
+    paddingVertical: 0,
+    marginTop: 2,
+  },
+
+  // Button
+  loginBtn: {
+    borderRadius: RADIUS.xl,
+    paddingVertical: SPACING.lg,
     alignItems: 'center',
-    marginTop: 5,
+    marginTop: SPACING.sm,
   },
-  buttonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
+  loginBtnText: {
+    color: COLORS.textWhite,
+    fontSize: FONT_SIZE.bodyLg,
+    fontWeight: FONT.bold,
+    letterSpacing: 0.5,
   },
+
+  // Link
+  linkRow: { marginTop: SPACING.xl, alignItems: 'center' },
   linkText: {
-    marginTop: 15,
-    color: '#2E8B57',
-    textDecorationLine: 'underline',
-    fontWeight: '600',
+    color: COLORS.textSecondary,
+    fontSize: FONT_SIZE.body,
+  },
+  linkBold: {
+    color: COLORS.emerald,
+    fontWeight: FONT.bold,
   },
 });
