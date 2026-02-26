@@ -3,13 +3,14 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState } from 'react';
 import {
-  Alert,
   Animated,
+  Modal,
   Platform,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -122,18 +123,18 @@ export default function SafetyTips() {
   const [isEnglish, setIsEnglish] = useState(true);
   const lang = isEnglish ? 'en' : 'ur';
   const [openKeys, setOpenKeys] = useState<Record<string, boolean>>({});
+  const [contactsVisible, setContactsVisible] = useState(false);
 
   const toggle = (key: string) => setOpenKeys(prev => ({ ...prev, [key]: !prev[key] }));
 
-  const showContacts = () => {
-    Alert.alert(
-      isEnglish ? 'Emergency Contacts' : 'ہنگامی رابطے',
-      isEnglish
-        ? `🚔 Police: 15\n🚑 Ambulance: 115\n🚒 Rescue: 1122\n📞 Tourist Police: 1422\n\nAlways follow local administration instructions.`
-        : `🚔 پولیس: 15\n🚑 ایمبولینس: 115\n🚒 ریسکیو: 1122\n📞 ٹورسٹ پولیس: 1422\n\nہمیشہ مقامی انتظامیہ کی ہدایات پر عمل کریں۔`,
-      [{ text: isEnglish ? 'OK' : 'ٹھیک ہے' }],
-    );
-  };
+  const showContacts = () => setContactsVisible(true);
+
+  const CONTACTS = [
+    { emoji: '🚔', label: { en: 'Police', ur: 'پولیس' }, number: '15', color: '#3B82F6' },
+    { emoji: '🚑', label: { en: 'Ambulance', ur: 'ایمبولینس' }, number: '115', color: '#EF4444' },
+    { emoji: '🚒', label: { en: 'Rescue', ur: 'ریسکیو' }, number: '1122', color: '#F97316' },
+    { emoji: '📞', label: { en: 'Tourist Police', ur: 'ٹورسٹ پولیس' }, number: '1422', color: '#8B5CF6' },
+  ];
 
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
@@ -215,6 +216,43 @@ export default function SafetyTips() {
         </View>
 
       </ScrollView>
+
+      {/* ─── Emergency Contacts Modal ─── */}
+      <Modal visible={contactsVisible} transparent animationType="none" statusBarTranslucent>
+        <View style={styles.modalOverlay}>
+          <TouchableWithoutFeedback onPress={() => setContactsVisible(false)}>
+            <View style={styles.modalBackdrop} />
+          </TouchableWithoutFeedback>
+          <View style={styles.modalCard}>
+            <View style={styles.modalHandle} />
+            <View style={styles.modalIconCircle}>
+              <MaterialCommunityIcons name="phone-alert" size={28} color="#E95B5B" />
+            </View>
+            <Text style={styles.modalTitle}>
+              {isEnglish ? 'Emergency Contacts' : 'ہنگامی رابطے'}
+            </Text>
+            {CONTACTS.map((c, i) => (
+              <View key={i} style={[styles.contactRow, i < CONTACTS.length - 1 && styles.contactBorder]}>
+                <Text style={styles.contactEmoji}>{c.emoji}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.contactLabel}>{c.label[lang]}</Text>
+                </View>
+                <View style={[styles.contactNumBadge, { backgroundColor: c.color + '15' }]}>
+                  <Text style={[styles.contactNum, { color: c.color }]}>{c.number}</Text>
+                </View>
+              </View>
+            ))}
+            <Text style={styles.contactNote}>
+              {isEnglish
+                ? 'Always follow local administration instructions.'
+                : 'ہمیشہ مقامی انتظامیہ کی ہدایات پر عمل کریں۔'}
+            </Text>
+            <TouchableOpacity style={styles.contactCloseBtn} onPress={() => setContactsVisible(false)}>
+              <Text style={styles.contactCloseText}>{isEnglish ? 'OK' : 'ٹھیک ہے'}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -306,4 +344,33 @@ const styles = StyleSheet.create({
   contactText: {
     color: '#fff', fontWeight: '800', fontSize: 15, flex: 1, textAlign: 'center',
   },
+
+  // Emergency Contacts Modal
+  modalOverlay: { flex: 1, justifyContent: 'flex-end' },
+  modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
+  modalCard: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 24,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 28,
+    paddingTop: 14,
+    alignItems: 'center',
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.15, shadowRadius: 24 },
+      android: { elevation: 20 },
+    }),
+  },
+  modalHandle: { width: 36, height: 5, borderRadius: 3, backgroundColor: '#E5E7EB', marginBottom: 20 },
+  modalIconCircle: { width: 60, height: 60, borderRadius: 20, backgroundColor: '#FEF2F2', justifyContent: 'center', alignItems: 'center', marginBottom: 14 },
+  modalTitle: { fontSize: 20, fontWeight: '800', color: '#1A1A1A', marginBottom: 20, letterSpacing: -0.3 },
+  contactRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, width: '100%', gap: 14 },
+  contactBorder: { borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+  contactEmoji: { fontSize: 24 },
+  contactLabel: { fontSize: 15, fontWeight: '600', color: '#374151' },
+  contactNumBadge: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 12 },
+  contactNum: { fontSize: 16, fontWeight: '800' },
+  contactNote: { fontSize: 12, color: '#9CA3AF', textAlign: 'center', marginTop: 14, lineHeight: 18 },
+  contactCloseBtn: { marginTop: 16, backgroundColor: G.lightGreen, paddingVertical: 14, paddingHorizontal: 40, borderRadius: 16 },
+  contactCloseText: { fontSize: 15, fontWeight: '700', color: G.midGreen },
 });

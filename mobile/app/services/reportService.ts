@@ -14,7 +14,7 @@ import { ReportRequest, ReportResponse } from './types';
 
 function guessMimeTypeFromUri(uri: string, isVideo: boolean = false): string {
     const lower = uri.toLowerCase();
-    
+
     if (isVideo) {
         if (lower.endsWith('.mp4')) return 'video/mp4';
         if (lower.endsWith('.mov')) return 'video/quicktime';
@@ -23,7 +23,7 @@ function guessMimeTypeFromUri(uri: string, isVideo: boolean = false): string {
         if (lower.endsWith('.webm')) return 'video/webm';
         return 'video/mp4'; // Default for videos
     }
-    
+
     // Image MIME types
     if (lower.endsWith('.png')) return 'image/png';
     if (lower.endsWith('.webp')) return 'image/webp';
@@ -56,7 +56,7 @@ export const submitReport = async (data: ReportRequest): Promise<ReportResponse>
                 if (uri.startsWith('file://') || uri.startsWith('content://')) {
                     const filename = `report_image_${Date.now()}_${idx}.jpg`;
                     const mimeType = guessMimeTypeFromUri(uri, false);
-                    
+
                     // React Native FormData format - fetch handles this better than axios
                     formData.append('images', {
                         uri: uri,
@@ -75,7 +75,7 @@ export const submitReport = async (data: ReportRequest): Promise<ReportResponse>
                 if (uri.startsWith('file://') || uri.startsWith('content://')) {
                     const filename = `report_video_${Date.now()}_${idx}.mp4`;
                     const mimeType = guessMimeTypeFromUri(uri, true);
-                    
+
                     // React Native FormData format for videos
                     formData.append('videos', {
                         uri: uri,
@@ -83,7 +83,7 @@ export const submitReport = async (data: ReportRequest): Promise<ReportResponse>
                         name: filename,
                     } as any);
                     videoFilesAdded++;
-                    
+
                     if (__DEV__) {
                         console.log(`📹 Adding video ${idx + 1}:`, { uri, mimeType, filename });
                     }
@@ -93,7 +93,7 @@ export const submitReport = async (data: ReportRequest): Promise<ReportResponse>
                     }
                 }
             });
-            
+
             if (__DEV__) {
                 console.log(`✅ Added ${videoFilesAdded} video(s) to FormData`);
             }
@@ -137,28 +137,28 @@ export const submitReport = async (data: ReportRequest): Promise<ReportResponse>
         }
 
         const result: ReportResponse = await response.json();
-        
+
         if (__DEV__) {
             console.log('✅ Report submitted successfully');
         }
-        
+
         return result;
     } catch (error: any) {
         console.log('Submit report error:', error);
-        
+
         // Handle network errors
         if (error.message && (error.message.includes('Network') || error.message.includes('fetch'))) {
-            throw { 
+            throw {
                 msg: 'Network error: Cannot connect to server. Please check your internet connection and ensure the backend is running.',
                 code: error.code,
             };
         }
-        
+
         // Return error as-is if it already has msg property
         if (error.msg) {
             throw error;
         }
-        
+
         throw { msg: 'Failed to submit report' };
     }
 };
@@ -172,6 +172,29 @@ export const getReports = async (): Promise<ReportResponse[]> => {
         return response.data;
     } catch (error: any) {
         console.log('Get reports error:', error.response?.data || error.message);
+        throw error.response?.data || { msg: 'Failed to fetch reports' };
+    }
+};
+
+/**
+ * Get reports with pagination (for infinite scroll)
+ */
+export interface PaginatedReportsResponse {
+    reports: ReportResponse[];
+    page: number;
+    limit: number;
+    total: number;
+    hasMore: boolean;
+}
+
+export const getReportsPaginated = async (page: number = 1, limit: number = 10): Promise<PaginatedReportsResponse> => {
+    try {
+        const response = await apiClient.get<PaginatedReportsResponse>('/report', {
+            params: { page, limit },
+        });
+        return response.data;
+    } catch (error: any) {
+        console.log('Get paginated reports error:', error.response?.data || error.message);
         throw error.response?.data || { msg: 'Failed to fetch reports' };
     }
 };
@@ -201,11 +224,11 @@ export const updateReport = async (id: string, data: Partial<ReportRequest>): Pr
         if (data.location !== undefined) formData.append('location', data.location);
         if (data.lat !== undefined) formData.append('lat', String(data.lat));
         if (data.lon !== undefined) formData.append('lon', String(data.lon));
-        
+
         // Separate new file uploads from existing image URLs
         const newImageFiles: string[] = [];
         const existingImageUrls: string[] = [];
-        
+
         if (data.imageUris && data.imageUris.length > 0) {
             data.imageUris.forEach((uri) => {
                 if (uri.startsWith('file://') || uri.startsWith('content://')) {
@@ -262,18 +285,18 @@ export const updateReport = async (id: string, data: Partial<ReportRequest>): Pr
         return result;
     } catch (error: any) {
         console.log('Update report error:', error);
-        
+
         if (error.message && (error.message.includes('Network') || error.message.includes('fetch'))) {
-            throw { 
+            throw {
                 msg: 'Network error: Cannot connect to server. Please check your internet connection and ensure the backend is running.',
                 code: error.code,
             };
         }
-        
+
         if (error.msg) {
             throw error;
         }
-        
+
         throw { msg: 'Failed to update report' };
     }
 };

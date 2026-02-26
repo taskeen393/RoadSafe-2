@@ -6,7 +6,6 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as Location from "expo-location";
 import React, { useRef, useState } from "react";
 import {
-  Alert,
   Dimensions,
   FlatList,
   Image,
@@ -21,6 +20,7 @@ import {
 } from "react-native";
 import MapView, { Marker, Polyline } from "react-native-maps";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useToast } from "../../components/ToastContext";
 
 // ─── Theme ───
 const G = {
@@ -47,6 +47,7 @@ const { width, height } = Dimensions.get("window");
 
 export default function TripScreen() {
   const insets = useSafeAreaInsets();
+  const { showToast } = useToast();
   const [mode, setMode] = useState<"give" | "view">("give");
   const [tracking, setTracking] = useState(false);
   const [route, setRoute] = useState<{ latitude: number; longitude: number }[]>([]);
@@ -73,7 +74,7 @@ export default function TripScreen() {
 
   const startTravel = async () => {
     const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== "granted") return Alert.alert("Permission denied", "Location permission is required!");
+    if (status !== "granted") return showToast({ type: 'warning', title: 'Permission Denied', message: 'Location permission is required!' });
     setTracking(true); setRoute([]);
     locationWatcher.current = await Location.watchPositionAsync(
       { accuracy: Location.Accuracy.High, timeInterval: 2000, distanceInterval: 3 },
@@ -94,7 +95,7 @@ export default function TripScreen() {
     locationWatcher.current?.remove();
     locationWatcher.current = null;
     setTracking(false);
-    Alert.alert("Trip Stopped", "You can now write your review.");
+    showToast({ type: 'info', title: 'Trip Stopped', message: 'You can now write your review' });
   };
 
   const pickImages = async () => {
@@ -117,10 +118,10 @@ export default function TripScreen() {
   };
 
   const submitReview = () => {
-    if (route.length === 0) return Alert.alert("No Route", "Start and stop a trip before submitting!");
+    if (route.length === 0) return showToast({ type: 'warning', title: 'No Route', message: 'Start and stop a trip before submitting!' });
     setReviews([{ id: Date.now().toString(), route, text: textInput, images: images.length ? images : undefined, videos: videos.length ? videos : undefined }, ...reviews]);
     setRoute([]); setTextInput(""); setImages([]); setVideos([]);
-    Alert.alert("✅ Submitted", "Your trip review has been saved!");
+    showToast({ type: 'success', title: 'Submitted!', message: 'Your trip review has been saved' });
   };
 
   const openReviewMap = (r: Review) => { setSelectedReview(r); setModalVisible(true); };

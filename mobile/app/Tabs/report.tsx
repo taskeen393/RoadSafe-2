@@ -5,7 +5,6 @@ import * as Location from 'expo-location';
 import * as SecureStore from 'expo-secure-store';
 import React, { useEffect, useState } from 'react';
 import {
-  Alert,
   FlatList,
   Image,
   Modal,
@@ -21,6 +20,8 @@ import MapView, { Marker } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { reportService } from '../services';
 import { ReportRequest } from '../services/types';
+import { useToast } from '../../components/ToastContext';
+import ActionSheet from '../../components/ActionSheet';
 
 // ─── Theme tokens ───
 const G = {
@@ -51,6 +52,9 @@ export default function ReportScreen({ navigation }: any) {
   const [mapVisible, setMapVisible] = useState(false);
   const [mapCoords, setMapCoords] = useState<{ lat: number; lon: number } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [imageSheetVisible, setImageSheetVisible] = useState(false);
+  const [videoSheetVisible, setVideoSheetVisible] = useState(false);
+  const { showToast } = useToast();
 
   // Incident type selection
   const incidentTypes = [
@@ -86,57 +90,49 @@ export default function ReportScreen({ navigation }: any) {
       const rev = await Location.reverseGeocodeAsync({ latitude, longitude });
       setLocation(rev[0] ? `${rev[0].name}, ${rev[0].city}` : `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
     } catch {
-      Alert.alert('Error', 'Failed to fetch location');
+      showToast({ type: 'error', title: 'Location Error', message: 'Failed to fetch location' });
     } finally {
       setIsFetchingLocation(false);
     }
   };
 
   const pickImages = async () => {
-    Alert.alert('Upload Image', 'Choose option', [
-      {
-        text: 'Camera', onPress: async () => {
-          const r = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.6 });
-          if (!r.canceled) setSelectedImages(p => [...p, ...r.assets.map(a => a.uri)]);
-        }
-      },
-      {
-        text: 'Gallery', onPress: async () => {
-          const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.6, allowsMultipleSelection: true as any });
-          if (!r.canceled) setSelectedImages(p => [...p, ...r.assets.map(a => a.uri)]);
-        }
-      },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+    setImageSheetVisible(true);
+  };
+
+  const handleImageFromCamera = async () => {
+    const r = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.6 });
+    if (!r.canceled) setSelectedImages(p => [...p, ...r.assets.map(a => a.uri)]);
+  };
+
+  const handleImageFromGallery = async () => {
+    const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.6, allowsMultipleSelection: true as any });
+    if (!r.canceled) setSelectedImages(p => [...p, ...r.assets.map(a => a.uri)]);
   };
 
   const pickVideos = async () => {
-    Alert.alert('Upload Video', 'Choose option', [
-      {
-        text: 'Camera', onPress: async () => {
-          const r = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Videos });
-          if (!r.canceled) setSelectedVideos(p => [...p, ...r.assets.map(a => a.uri)]);
-        }
-      },
-      {
-        text: 'Gallery', onPress: async () => {
-          const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Videos, allowsMultipleSelection: true as any });
-          if (!r.canceled) setSelectedVideos(p => [...p, ...r.assets.map(a => a.uri)]);
-        }
-      },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+    setVideoSheetVisible(true);
+  };
+
+  const handleVideoFromCamera = async () => {
+    const r = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Videos });
+    if (!r.canceled) setSelectedVideos(p => [...p, ...r.assets.map(a => a.uri)]);
+  };
+
+  const handleVideoFromGallery = async () => {
+    const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Videos, allowsMultipleSelection: true as any });
+    if (!r.canceled) setSelectedVideos(p => [...p, ...r.assets.map(a => a.uri)]);
   };
 
   const submitReport = async () => {
     if (!titleInput.trim()) {
-      return Alert.alert('Missing Title', 'Please add a title for your report.');
+      return showToast({ type: 'warning', title: 'Missing Title', message: 'Please add a title for your report' });
     }
     if (!textInput.trim() && selectedImages.length === 0 && selectedVideos.length === 0) {
-      return Alert.alert('Add something', 'Please add text, image or video before submitting.');
+      return showToast({ type: 'warning', title: 'Add Content', message: 'Please add text, image or video before submitting' });
     }
     const token = await SecureStore.getItemAsync('token');
-    if (!token) return Alert.alert('Not logged in');
+    if (!token) return showToast({ type: 'error', title: 'Not Logged In', message: 'Please login to submit a report' });
     setIsSubmitting(true);
 
     const safeLocation = location || (lat ? `${lat.toFixed(4)}, ${lon?.toFixed(4)}` : 'Unknown location');
@@ -151,9 +147,9 @@ export default function ReportScreen({ navigation }: any) {
     try {
       await reportService.submitReport(reportData);
       setTextInput(''); setTitleInput(''); setSelectedImages([]); setSelectedVideos([]); setSelectedType('');
-      Alert.alert('✅ Submitted', 'Your report has been sent successfully!');
+      showToast({ type: 'success', title: 'Submitted!', message: 'Your report has been sent successfully' });
     } catch (err: any) {
-      Alert.alert('Error', err.msg || 'Failed to submit report');
+      showToast({ type: 'error', title: 'Error', message: err.msg || 'Failed to submit report' });
     } finally {
       setIsSubmitting(false);
     }
@@ -332,6 +328,28 @@ export default function ReportScreen({ navigation }: any) {
           </TouchableOpacity>
         </View>
       </Modal>
+
+      {/* Image Action Sheet */}
+      <ActionSheet
+        visible={imageSheetVisible}
+        title="Upload Image"
+        options={[
+          { label: 'Take Photo', icon: 'camera', iconColor: '#2D7A4D', onPress: handleImageFromCamera },
+          { label: 'Choose from Gallery', icon: 'images', iconColor: '#3B9EE8', onPress: handleImageFromGallery },
+        ]}
+        onCancel={() => setImageSheetVisible(false)}
+      />
+
+      {/* Video Action Sheet */}
+      <ActionSheet
+        visible={videoSheetVisible}
+        title="Upload Video"
+        options={[
+          { label: 'Record Video', icon: 'videocam', iconColor: '#D97706', onPress: handleVideoFromCamera },
+          { label: 'Choose from Gallery', icon: 'film', iconColor: '#8B5CF6', onPress: handleVideoFromGallery },
+        ]}
+        onCancel={() => setVideoSheetVisible(false)}
+      />
     </View>
   );
 }

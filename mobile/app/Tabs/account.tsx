@@ -8,7 +8,6 @@ import { useFocusEffect } from "@react-navigation/native";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Dimensions,
   Image,
   KeyboardAvoidingView,
@@ -25,6 +24,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "../context/AuthContext";
 import { userService } from "../services";
+import { useToast } from "../../components/ToastContext";
+import ConfirmDialog from "../../components/ConfirmDialog";
 
 const { width } = Dimensions.get("window");
 
@@ -56,6 +57,8 @@ export default function AccountScreen() {
   const [editName, setEditName] = useState('');
   const [editEmail, setEditEmail] = useState('');
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [logoutDialogVisible, setLogoutDialogVisible] = useState(false);
+  const { showToast } = useToast();
 
   const isValidImage = (url: string | undefined | null): boolean => {
     return !!url && url !== 'null' && url !== 'undefined' && url.startsWith('http');
@@ -91,7 +94,7 @@ export default function AccountScreen() {
   const pickImage = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert("Permission required");
+      showToast({ type: 'warning', title: 'Permission Required', message: 'Please allow access to your photos' });
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -136,9 +139,9 @@ export default function AccountScreen() {
         await refreshUser();
       }
       setEditingImage(null);
-      Alert.alert("Success", "Profile picture updated!");
+      showToast({ type: 'success', title: 'Success', message: 'Profile picture updated!' });
     } catch (error: any) {
-      Alert.alert("Error", error.msg || "Failed to update profile picture");
+      showToast({ type: 'error', title: 'Upload Failed', message: error.msg || 'Failed to update profile picture' });
     } finally {
       setIsUploading(false);
     }
@@ -156,10 +159,10 @@ export default function AccountScreen() {
     const trimmedEmail = editEmail.trim();
 
     if (!trimmedName) {
-      return Alert.alert('Required', 'Please enter your name');
+      return showToast({ type: 'warning', title: 'Required', message: 'Please enter your name' });
     }
     if (!trimmedEmail || !trimmedEmail.includes('@')) {
-      return Alert.alert('Required', 'Please enter a valid email');
+      return showToast({ type: 'warning', title: 'Required', message: 'Please enter a valid email' });
     }
 
     // If nothing changed, just close
@@ -176,9 +179,9 @@ export default function AccountScreen() {
       });
       await refreshUser();
       setEditModalVisible(false);
-      Alert.alert('✅ Updated', 'Your profile has been updated!');
+      showToast({ type: 'success', title: 'Updated!', message: 'Your profile has been updated' });
     } catch (error: any) {
-      Alert.alert('Error', error.msg || 'Failed to update profile');
+      showToast({ type: 'error', title: 'Error', message: error.msg || 'Failed to update profile' });
     } finally {
       setIsSavingProfile(false);
     }
@@ -186,19 +189,17 @@ export default function AccountScreen() {
 
   // ─── Logout ───
   const handleLogout = async () => {
-    Alert.alert('Logout', 'Are you sure you want to logout?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Logout', style: 'destructive', onPress: async () => {
-          try {
-            await logout();
-            router.replace("/auth/login");
-          } catch {
-            router.replace("/auth/login");
-          }
-        }
-      }
-    ]);
+    setLogoutDialogVisible(true);
+  };
+
+  const confirmLogout = async () => {
+    setLogoutDialogVisible(false);
+    try {
+      await logout();
+      router.replace("/auth/login");
+    } catch {
+      router.replace("/auth/login");
+    }
   };
 
   const firstName = user?.name?.split(' ')[0] || 'User';
@@ -459,6 +460,19 @@ export default function AccountScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* ─── Logout Confirm Dialog ─── */}
+      <ConfirmDialog
+        visible={logoutDialogVisible}
+        title="Logout"
+        message="Are you sure you want to logout? You'll need to sign in again."
+        confirmText="Logout"
+        cancelText="Cancel"
+        destructive
+        icon="log-out-outline"
+        onConfirm={confirmLogout}
+        onCancel={() => setLogoutDialogVisible(false)}
+      />
     </View>
   );
 }

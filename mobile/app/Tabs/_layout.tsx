@@ -2,10 +2,11 @@
 import { Tabs } from 'expo-router';
 import * as SecureStore from 'expo-secure-store';
 import React, { useCallback, useState } from 'react';
-import { Alert, Platform, StatusBar, View } from 'react-native';
+import { Platform, StatusBar, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ReportProvider from '../context/reportcontent';
 import ChatbotFAB from '../../components/ChatbotFAB';
+import { useToast } from '../../components/ToastContext';
 
 import {
   Ionicons,
@@ -15,6 +16,7 @@ import { useFocusEffect } from '@react-navigation/native';
 
 export default function Layout() {
   const insets = useSafeAreaInsets();
+  const { showToast } = useToast();
   const [isAuthChecked, setIsAuthChecked] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
@@ -31,7 +33,7 @@ export default function Layout() {
         } catch (err) {
           console.log('Auth check error:', err);
           if (isActive) {
-            Alert.alert('Error', 'Failed to verify login. Please try again.');
+            showToast({ type: 'error', title: 'Auth Error', message: 'Failed to verify login. Please try again.' });
             setIsLoggedIn(false);
             setIsAuthChecked(true);
           }

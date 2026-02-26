@@ -9,7 +9,6 @@ import * as Location from "expo-location";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Dimensions,
   FlatList,
   Keyboard,
@@ -22,6 +21,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import MapView, { MapPressEvent, Marker } from "react-native-maps";
+import { useToast } from "../../components/ToastContext";
 
 import { weatherService } from "../services";
 import { CitySearchResult, WeatherData } from "../services/types";
@@ -52,6 +52,7 @@ function getGradient(description: string): readonly [string, string, string] {
 
 export default function WeatherScreen() {
   const insets = useSafeAreaInsets();
+  const { showToast } = useToast();
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [loading, setLoading] = useState(true);
   const [locationName, setLocationName] = useState("Fetching location...");
@@ -111,7 +112,7 @@ export default function WeatherScreen() {
       setLandslideRisk(risk);
     } catch (err: any) {
       console.log(err?.message);
-      Alert.alert("Error", "Unable to fetch weather");
+      showToast({ type: 'error', title: 'Weather Error', message: 'Unable to fetch weather data' });
     } finally {
       setLoading(false);
     }

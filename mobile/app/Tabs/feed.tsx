@@ -3,9 +3,9 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ResizeMode, Video } from 'expo-av';
 import { useFocusEffect } from '@react-navigation/native';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
-  Alert,
+  ActivityIndicator,
   Dimensions,
   FlatList,
   Image,
@@ -16,14 +16,14 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-  ScrollView,
 } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { reportService } from '../services';
-import { ReportResponse } from '../services/types';
 import { getCurrentUser } from '../services/authService';
+import { useToast } from '../../components/ToastContext';
+import ConfirmDialog from '../../components/ConfirmDialog';
 
 const { width, height } = Dimensions.get('window');
 
@@ -59,8 +59,15 @@ export default function FeedScreen() {
   const insets = useSafeAreaInsets();
   const [reports, setReports] = useState<ReportItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [currentUserName, setCurrentUserName] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [totalReports, setTotalReports] = useState(0);
+  const isLoadingRef = useRef(false);
+
+  const PAGE_SIZE = 10;
 
   // Viewer States
   const [modalVisible, setModalVisible] = useState(false);
@@ -78,11 +85,35 @@ export default function FeedScreen() {
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
 
-  /* ---------------- Fetching ---------------- */
+  // Delete Confirm State
+  const [deleteDialogVisible, setDeleteDialogVisible] = useState(false);
+  const [deletingReport, setDeletingReport] = useState<ReportItem | null>(null);
+
+  const { showToast } = useToast();
+
+  const mapReportData = (data: any[]): ReportItem[] =>
+    data.map((r: any) => ({
+      _id: String(r._id),
+      user: String(r.user ?? 'Unknown User'),
+      userId: r.userId ? String(r.userId) : undefined,
+      userProfileImage: r.userProfileImage ? String(r.userProfileImage) : undefined,
+      location: String(r.location ?? 'Unknown location'),
+      lat: typeof r.lat === 'number' ? r.lat : undefined,
+      lon: typeof r.lon === 'number' ? r.lon : undefined,
+      text: String(r.description ?? ''),
+      title: r.title ? String(r.title) : undefined,
+      imageUris: Array.isArray(r.imageUris) ? r.imageUris : [],
+      videoUris: Array.isArray(r.videoUris) ? r.videoUris : [],
+      dateTime: String(r.createdAt ?? new Date().toISOString()),
+    }));
+
+  /* ----- Initial fetch (page 1) ----- */
   useFocusEffect(
     useCallback(() => {
       let isMounted = true;
-      const fetchData = async () => {
+      const fetchInitial = async () => {
+        if (isLoadingRef.current) return;
+        isLoadingRef.current = true;
         setLoading(true);
         try {
           const user = await getCurrentUser();
@@ -90,34 +121,63 @@ export default function FeedScreen() {
             setCurrentUserId((user._id || (user as any).id) ? String(user._id || (user as any).id) : null);
             setCurrentUserName(user.name ? String(user.name) : null);
           }
-          const data = await reportService.getReports();
+          const res = await reportService.getReportsPaginated(1, PAGE_SIZE);
           if (!isMounted) return;
-
-          const mapped: ReportItem[] = data.map((r: ReportResponse) => ({
-            _id: String(r._id),
-            user: String(r.user ?? 'Unknown User'),
-            userId: r.userId ? String(r.userId) : undefined,
-            userProfileImage: r.userProfileImage ? String(r.userProfileImage) : undefined,
-            location: String(r.location ?? 'Unknown location'),
-            lat: typeof r.lat === 'number' ? r.lat : undefined,
-            lon: typeof r.lon === 'number' ? r.lon : undefined,
-            text: String(r.description ?? ''),
-            title: r.title ? String(r.title) : undefined,
-            imageUris: Array.isArray(r.imageUris) ? r.imageUris : [],
-            videoUris: Array.isArray(r.videoUris) ? r.videoUris : [],
-            dateTime: String(r.createdAt ?? new Date().toISOString()),
-          }));
-          setReports(mapped.reverse());
+          setReports(mapReportData(res.reports));
+          setPage(1);
+          setHasMore(res.hasMore);
+          setTotalReports(res.total);
         } catch (err) {
-          // Silent error or toast could go here
+          // silent
         } finally {
           setLoading(false);
+          isLoadingRef.current = false;
         }
       };
-      fetchData();
+      fetchInitial();
       return () => { isMounted = false; };
     }, [])
   );
+
+  /* ----- Load more (next page) ----- */
+  const loadMore = useCallback(async () => {
+    if (!hasMore || isLoadingRef.current || loadingMore) return;
+    isLoadingRef.current = true;
+    setLoadingMore(true);
+    const nextPage = page + 1;
+    try {
+      const res = await reportService.getReportsPaginated(nextPage, PAGE_SIZE);
+      const newItems = mapReportData(res.reports);
+      setReports(prev => [...prev, ...newItems]);
+      setPage(nextPage);
+      setHasMore(res.hasMore);
+      setTotalReports(res.total);
+    } catch {
+      // silent
+    } finally {
+      setLoadingMore(false);
+      isLoadingRef.current = false;
+    }
+  }, [hasMore, loadingMore, page]);
+
+  /* ----- Pull-to-refresh ----- */
+  const handleRefresh = useCallback(async () => {
+    if (isLoadingRef.current) return;
+    isLoadingRef.current = true;
+    setLoading(true);
+    try {
+      const res = await reportService.getReportsPaginated(1, PAGE_SIZE);
+      setReports(mapReportData(res.reports));
+      setPage(1);
+      setHasMore(res.hasMore);
+      setTotalReports(res.total);
+    } catch {
+      // silent
+    } finally {
+      setLoading(false);
+      isLoadingRef.current = false;
+    }
+  }, []);
 
   /* ---------------- Actions ---------------- */
   const openMedia = (uris: string[], index = 0, isVideo = false) => {
@@ -136,17 +196,21 @@ export default function FeedScreen() {
   };
 
   const confirmDelete = (report: ReportItem) => {
-    Alert.alert('Delete Post', 'Are you sure?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete', style: 'destructive', onPress: async () => {
-          try {
-            await reportService.deleteReport(report._id);
-            setReports(prev => prev.filter(r => r._id !== report._id));
-          } catch { Alert.alert('Error', 'Could not delete post'); }
-        }
-      }
-    ]);
+    setDeletingReport(report);
+    setDeleteDialogVisible(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deletingReport) return;
+    setDeleteDialogVisible(false);
+    try {
+      await reportService.deleteReport(deletingReport._id);
+      setReports(prev => prev.filter(r => r._id !== deletingReport._id));
+      showToast({ type: 'success', title: 'Deleted', message: 'Post has been removed' });
+    } catch {
+      showToast({ type: 'error', title: 'Error', message: 'Could not delete post' });
+    }
+    setDeletingReport(null);
   };
 
   const saveEdit = async () => {
@@ -159,7 +223,10 @@ export default function FeedScreen() {
       } as any);
       setReports(prev => prev.map(r => r._id === editingReport._id ? { ...r, title: editTitle, text: editDescription } : r));
       setEditModalVisible(false);
-    } catch { Alert.alert('Error', 'Update failed'); }
+      showToast({ type: 'success', title: 'Updated', message: 'Post has been updated' });
+    } catch {
+      showToast({ type: 'error', title: 'Error', message: 'Update failed' });
+    }
   };
 
   const timeAgo = (dateStr: string) => {
@@ -191,7 +258,7 @@ export default function FeedScreen() {
           </View>
           {reports.length > 0 && (
             <View style={styles.statsBadge}>
-              <Text style={styles.statsNum}>{reports.length}</Text>
+              <Text style={styles.statsNum}>{totalReports || reports.length}</Text>
               <Text style={styles.statsLabel}>Reports</Text>
             </View>
           )}
@@ -205,7 +272,21 @@ export default function FeedScreen() {
         contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
         refreshing={loading}
-        onRefresh={() => { /* re-trigger fetch */ }}
+        onRefresh={handleRefresh}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.4}
+        ListFooterComponent={
+          loadingMore ? (
+            <View style={styles.loadingMore}>
+              <ActivityIndicator size="small" color={G.midGreen} />
+              <Text style={styles.loadingMoreText}>Loading more reports...</Text>
+            </View>
+          ) : !hasMore && reports.length > 0 ? (
+            <View style={styles.loadingMore}>
+              <Text style={styles.loadingMoreText}>No more reports</Text>
+            </View>
+          ) : null
+        }
         ListEmptyComponent={
           !loading ? (
             <View style={styles.empty}>
@@ -220,19 +301,14 @@ export default function FeedScreen() {
         renderItem={({ item }) => {
           const hasLoc = item.lat !== undefined && item.lon !== undefined;
           const owner = isOwner(item);
-          const totalMedia = item.imageUris.length + item.videoUris.length;
+          const imgCount = item.imageUris.length;
+          const vidCount = item.videoUris.length;
+          const totalMedia = imgCount + vidCount;
+          const hasMedia = totalMedia > 0;
 
           return (
             <View style={styles.card}>
-              {/* Top accent line */}
-              <LinearGradient
-                colors={[G.darkGreen, G.midGreen]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.cardAccent}
-              />
-
-              {/* Header */}
+              {/* ─── Header ─── */}
               <View style={styles.cardHeader}>
                 <View style={styles.avatarWrap}>
                   {item.userProfileImage ? (
@@ -242,13 +318,19 @@ export default function FeedScreen() {
                       <Text style={styles.avatarInitials}>{item.user.charAt(0).toUpperCase()}</Text>
                     </LinearGradient>
                   )}
-                  <View style={styles.onlineDot} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.userName} numberOfLines={1}>{item.user}</Text>
                   <View style={styles.timeRow}>
                     <Ionicons name="time-outline" size={11} color={G.sub} />
                     <Text style={styles.timeText}>{timeAgo(item.dateTime)}</Text>
+                    {!!item.location && item.location !== 'Unknown location' && (
+                      <>
+                        <Text style={styles.timeDot}>·</Text>
+                        <Ionicons name="location" size={11} color={G.sub} />
+                        <Text style={styles.timeText} numberOfLines={1}>{item.location.split(',')[0]}</Text>
+                      </>
+                    )}
                   </View>
                 </View>
                 {owner && (
@@ -263,52 +345,116 @@ export default function FeedScreen() {
                 )}
               </View>
 
-              {/* Content */}
+              {/* ─── Text Content ─── */}
               <View style={styles.cardBody}>
                 {!!item.title && <Text style={styles.cardTitle}>{item.title}</Text>}
-                <Text style={styles.cardText}>{item.text}</Text>
-
-                {/* Location Badge */}
-                {!!item.location && item.location !== 'Unknown location' && (
-                  <TouchableOpacity
-                    style={styles.locBadge}
-                    disabled={!hasLoc}
-                    onPress={() => hasLoc && openMap(item.lat!, item.lon!)}
-                  >
-                    <View style={styles.locIconWrap}>
-                      <Ionicons name="location-sharp" size={12} color={G.midGreen} />
-                    </View>
-                    <Text style={styles.locText} numberOfLines={1}>{item.location}</Text>
-                    {hasLoc && <Ionicons name="chevron-forward" size={12} color={G.midGreen} />}
-                  </TouchableOpacity>
+                {!!item.text && item.text !== 'No description' && (
+                  <Text style={styles.cardText} numberOfLines={hasMedia ? 3 : 8}>{item.text}</Text>
                 )}
+              </View>
 
-                {/* Media Gallery */}
-                {(item.imageUris.length > 0 || item.videoUris.length > 0) && (
-                  <View style={styles.mediaSection}>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
+              {/* ─── Media Section ─── */}
+              {hasMedia && (
+                <View style={styles.mediaSection}>
+                  {/* Single full-width image */}
+                  {imgCount === 1 && vidCount === 0 && (
+                    <TouchableOpacity activeOpacity={0.9} onPress={() => openMedia(item.imageUris, 0)}>
+                      <Image source={{ uri: item.imageUris[0] }} style={styles.mediaHero} />
+                    </TouchableOpacity>
+                  )}
+
+                  {/* Two images side by side */}
+                  {imgCount === 2 && vidCount === 0 && (
+                    <View style={styles.mediaGrid2}>
                       {item.imageUris.map((uri, i) => (
-                        <TouchableOpacity key={i} onPress={() => openMedia(item.imageUris, i)} activeOpacity={0.9}>
-                          <Image source={{ uri }} style={styles.mediaThumb} />
-                          {i === 0 && totalMedia > 1 && (
-                            <View style={styles.mediaBadge}>
-                              <Ionicons name="images" size={10} color="#fff" />
-                              <Text style={styles.mediaBadgeText}>{totalMedia}</Text>
+                        <TouchableOpacity key={i} activeOpacity={0.9} onPress={() => openMedia(item.imageUris, i)} style={{ flex: 1 }}>
+                          <Image source={{ uri }} style={styles.mediaGrid2Img} />
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* 3+ images: hero + grid */}
+                  {imgCount >= 3 && vidCount === 0 && (
+                    <View>
+                      <TouchableOpacity activeOpacity={0.9} onPress={() => openMedia(item.imageUris, 0)}>
+                        <Image source={{ uri: item.imageUris[0] }} style={styles.mediaHero} />
+                      </TouchableOpacity>
+                      <View style={styles.mediaGrid2}>
+                        <TouchableOpacity activeOpacity={0.9} onPress={() => openMedia(item.imageUris, 1)} style={{ flex: 1 }}>
+                          <Image source={{ uri: item.imageUris[1] }} style={styles.mediaGridSmall} />
+                        </TouchableOpacity>
+                        <TouchableOpacity activeOpacity={0.9} onPress={() => openMedia(item.imageUris, 2)} style={{ flex: 1 }}>
+                          <Image source={{ uri: item.imageUris[2] }} style={styles.mediaGridSmall} />
+                          {imgCount > 3 && (
+                            <View style={styles.mediaOverlay}>
+                              <Text style={styles.mediaOverlayText}>+{imgCount - 3}</Text>
                             </View>
                           )}
                         </TouchableOpacity>
-                      ))}
-                      {item.videoUris.map((uri, i) => (
-                        <TouchableOpacity key={i} onPress={() => openMedia(item.videoUris, i, true)} activeOpacity={0.9}>
-                          <View style={styles.videoThumb}>
-                            <View style={styles.playBtnBg}>
-                              <Ionicons name="play" size={20} color="#fff" />
-                            </View>
-                            <Text style={styles.videoLabel}>Video</Text>
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Videos */}
+                  {vidCount > 0 && imgCount === 0 && (
+                    <TouchableOpacity activeOpacity={0.9} onPress={() => openMedia(item.videoUris, 0, true)}>
+                      <View style={styles.videoHero}>
+                        <View style={styles.videoPlayCircle}>
+                          <Ionicons name="play" size={28} color="#fff" />
+                        </View>
+                        <View style={styles.videoBadge}>
+                          <Ionicons name="videocam" size={12} color="#fff" />
+                          <Text style={styles.videoBadgeText}>{vidCount > 1 ? `${vidCount} videos` : 'Video'}</Text>
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  )}
+
+                  {/* Mixed: images + videos */}
+                  {imgCount > 0 && vidCount > 0 && (
+                    <View>
+                      <TouchableOpacity activeOpacity={0.9} onPress={() => openMedia(item.imageUris, 0)}>
+                        <Image source={{ uri: item.imageUris[0] }} style={styles.mediaHero} />
+                        {imgCount > 1 && (
+                          <View style={styles.mediaBadge}>
+                            <Ionicons name="images" size={11} color="#fff" />
+                            <Text style={styles.mediaBadgeText}>{imgCount}</Text>
                           </View>
-                        </TouchableOpacity>
-                      ))}
-                    </ScrollView>
+                        )}
+                      </TouchableOpacity>
+                      <TouchableOpacity activeOpacity={0.9} onPress={() => openMedia(item.videoUris, 0, true)}>
+                        <View style={styles.videoStrip}>
+                          <View style={styles.videoStripPlayBtn}>
+                            <Ionicons name="play" size={16} color="#fff" />
+                          </View>
+                          <Text style={styles.videoStripText}>{vidCount} video{vidCount > 1 ? 's' : ''}</Text>
+                          <Ionicons name="chevron-forward" size={14} color="rgba(255,255,255,0.6)" />
+                        </View>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              )}
+
+              {/* ─── Footer ─── */}
+              <View style={styles.cardFooter}>
+                {!!item.location && item.location !== 'Unknown location' && (
+                  <TouchableOpacity
+                    style={[styles.footerChip, { flex: 1 }]}
+                    disabled={!hasLoc}
+                    onPress={() => hasLoc && openMap(item.lat!, item.lon!)}
+                  >
+                    <Ionicons name="location" size={14} color={hasLoc ? G.midGreen : G.sub} />
+                    <Text style={[styles.footerChipText, !hasLoc && { color: G.sub }]}>
+                      {item.location}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                {hasMedia && (
+                  <View style={styles.footerMediaBadge}>
+                    <Ionicons name={imgCount > 0 ? 'images-outline' : 'videocam-outline'} size={13} color={G.sub} />
+                    <Text style={[styles.footerChipText, { color: G.sub }]}>{totalMedia} media</Text>
                   </View>
                 )}
               </View>
@@ -382,6 +528,18 @@ export default function FeedScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* ─── Delete Confirm Dialog ─── */}
+      <ConfirmDialog
+        visible={deleteDialogVisible}
+        title="Delete Post"
+        message="Are you sure you want to delete this post? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        destructive
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => { setDeleteDialogVisible(false); setDeletingReport(null); }}
+      />
     </View>
   );
 }
@@ -404,43 +562,58 @@ const styles = StyleSheet.create({
   // Card
   card: {
     backgroundColor: G.card,
-    borderRadius: 20,
-    marginBottom: 18,
+    borderRadius: 22,
+    marginBottom: 16,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.04)',
     ...Platform.select({
-      ios: { shadowColor: '#1A4D2E', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.08, shadowRadius: 14 },
-      android: { elevation: 4 },
+      ios: { shadowColor: '#1A4D2E', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 16 },
+      android: { elevation: 3 },
     }),
   },
-  cardAccent: { height: 3, width: '100%' },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12 },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 16, paddingBottom: 10, gap: 12 },
   avatarWrap: { position: 'relative' },
-  avatar: { width: 44, height: 44, borderRadius: 22, borderWidth: 2, borderColor: G.midGreen },
-  avatarPlaceholder: { width: 44, height: 44, borderRadius: 22, justifyContent: 'center', alignItems: 'center' },
-  avatarInitials: { fontSize: 17, fontWeight: '800', color: '#fff' },
-  onlineDot: { position: 'absolute', bottom: 1, right: 1, width: 11, height: 11, borderRadius: 6, backgroundColor: '#22C55E', borderWidth: 2, borderColor: '#fff' },
-  userName: { fontSize: 15, fontWeight: '700', color: G.text, letterSpacing: -0.2 },
-  timeRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
+  avatar: { width: 42, height: 42, borderRadius: 21, borderWidth: 2, borderColor: G.lightGreen },
+  avatarPlaceholder: { width: 42, height: 42, borderRadius: 21, justifyContent: 'center', alignItems: 'center' },
+  avatarInitials: { fontSize: 16, fontWeight: '800', color: '#fff' },
+  userName: { fontSize: 15, fontWeight: '700', color: G.text, letterSpacing: -0.3 },
+  timeRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2, flexShrink: 1 },
   timeText: { fontSize: 12, color: G.sub },
-  actions: { flexDirection: 'row', gap: 8 },
-  actionIcon: { width: 34, height: 34, borderRadius: 12, backgroundColor: G.lightGreen, justifyContent: 'center', alignItems: 'center' },
+  timeDot: { fontSize: 12, color: G.sub, marginHorizontal: 1 },
+  actions: { flexDirection: 'row', gap: 6 },
+  actionIcon: { width: 32, height: 32, borderRadius: 10, backgroundColor: G.lightGreen, justifyContent: 'center', alignItems: 'center' },
 
   // Body
-  cardBody: { paddingHorizontal: 16, paddingBottom: 18 },
-  cardTitle: { fontSize: 16, fontWeight: '700', color: G.text, marginBottom: 6, letterSpacing: -0.2 },
-  cardText: { fontSize: 14, lineHeight: 22, color: '#374151', marginBottom: 12 },
-  locBadge: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', backgroundColor: G.lightGreen, paddingVertical: 6, paddingHorizontal: 12, borderRadius: 14, gap: 6, marginBottom: 12, borderWidth: 1, borderColor: G.border },
-  locIconWrap: { width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(45,122,77,0.12)', justifyContent: 'center', alignItems: 'center' },
-  locText: { fontSize: 12, color: G.midGreen, fontWeight: '600', maxWidth: width * 0.55 },
+  cardBody: { paddingHorizontal: 16, paddingBottom: 6 },
+  cardTitle: { fontSize: 16, fontWeight: '700', color: G.text, marginBottom: 4, letterSpacing: -0.3, lineHeight: 22 },
+  cardText: { fontSize: 14, lineHeight: 21, color: '#4B5563', marginBottom: 8 },
 
   // Media
-  mediaSection: { marginTop: 4 },
-  mediaThumb: { width: 150, height: 190, borderRadius: 14, backgroundColor: '#eee' },
-  videoThumb: { width: 150, height: 190, borderRadius: 14, backgroundColor: '#111827', justifyContent: 'center', alignItems: 'center', gap: 6 },
-  playBtnBg: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
-  videoLabel: { fontSize: 11, fontWeight: '700', color: 'rgba(255,255,255,0.7)', letterSpacing: 0.5 },
-  mediaBadge: { position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.55)', flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10 },
-  mediaBadgeText: { fontSize: 11, fontWeight: '700', color: '#fff' },
+  mediaSection: { marginTop: 2 },
+  mediaHero: { width: '100%' as any, height: 220, backgroundColor: '#F3F4F6' },
+  mediaGrid2: { flexDirection: 'row', gap: 2, marginTop: 2 },
+  mediaGrid2Img: { width: '100%' as any, height: 140, backgroundColor: '#F3F4F6' },
+  mediaGridSmall: { width: '100%' as any, height: 110, backgroundColor: '#F3F4F6' },
+  mediaOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', alignItems: 'center' },
+  mediaOverlayText: { fontSize: 22, fontWeight: '800', color: '#fff' },
+  mediaBadge: { position: 'absolute', top: 10, right: 10, backgroundColor: 'rgba(0,0,0,0.55)', flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12 },
+  mediaBadgeText: { fontSize: 12, fontWeight: '700', color: '#fff' },
+
+  // Video
+  videoHero: { width: '100%' as any, height: 180, backgroundColor: '#111827', justifyContent: 'center', alignItems: 'center' },
+  videoPlayCircle: { width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(45,122,77,0.85)', justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.3)' },
+  videoBadge: { position: 'absolute', bottom: 12, left: 12, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 10 },
+  videoBadgeText: { fontSize: 12, fontWeight: '600', color: '#fff' },
+  videoStrip: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#1F2937', paddingHorizontal: 16, paddingVertical: 12 },
+  videoStripPlayBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: G.midGreen, justifyContent: 'center', alignItems: 'center' },
+  videoStripText: { flex: 1, fontSize: 13, fontWeight: '600', color: 'rgba(255,255,255,0.85)' },
+
+  // Footer
+  cardFooter: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 16, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.04)', marginTop: 4 },
+  footerChip: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
+  footerChipText: { fontSize: 13, color: G.text, lineHeight: 18, flexShrink: 1 },
+  footerMediaBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 4, paddingHorizontal: 10, borderRadius: 10, backgroundColor: '#F3F4F6', alignSelf: 'flex-start' },
 
   // Empty
   empty: { alignItems: 'center', marginTop: 80, gap: 12, paddingHorizontal: 40 },
@@ -462,4 +635,8 @@ const styles = StyleSheet.create({
   editInput: { backgroundColor: '#F9FAFB', borderWidth: 1.5, borderColor: '#E5E7EB', borderRadius: 14, padding: 14, marginBottom: 12, fontSize: 15, color: G.text },
   editBtns: { flexDirection: 'row', gap: 10, justifyContent: 'flex-end', marginTop: 4 },
   editBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 11, paddingHorizontal: 20, borderRadius: 12 },
+
+  // Loading more
+  loadingMore: { alignItems: 'center', paddingVertical: 20, gap: 8, flexDirection: 'row', justifyContent: 'center' },
+  loadingMoreText: { fontSize: 13, color: G.sub, fontWeight: '500' },
 });

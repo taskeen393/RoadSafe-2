@@ -18,7 +18,7 @@ export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost
 
 // Log API base URL in development to help debug connection issues
 if (__DEV__) {
-    console.log('🔗 API Base URL:', API_BASE_URL || '⚠️ NOT SET - API calls will fail!');
+   // console.log('🔗 API Base URL:', API_BASE_URL || '⚠️ NOT SET - API calls will fail!');
     if (!process.env.EXPO_PUBLIC_API_URL) {
         console.warn('⚠️ EXPO_PUBLIC_API_URL not set, using default:', API_BASE_URL);
         console.warn('💡 For physical devices, set EXPO_PUBLIC_API_URL to your computer IP address');
@@ -80,13 +80,13 @@ apiClient.interceptors.response.use(
         if (__DEV__) {
             // Network error (no response from server)
             if (!error.response) {
-                console.error('❌ Network Error:', {
-                    url: error.config?.url,
-                    fullUrl: error.config?.baseURL ? `${error.config.baseURL}${error.config.url || ''}` : 'unknown',
-                    message: error.message,
-                    code: error.code,
-                    hint: 'Check if backend is running and API_BASE_URL is correct'
-                });
+                // console.error('❌ Network Error:', {
+                //     url: error.config?.url,
+                //     fullUrl: error.config?.baseURL ? `${error.config.baseURL}${error.config.url || ''}` : 'unknown',
+                //     message: error.message,
+                //     code: error.code,
+                //     hint: 'Check if backend is running and API_BASE_URL is correct'
+                // });
             } else {
                 // Server responded with error status
                 console.error('❌ API Error:', {

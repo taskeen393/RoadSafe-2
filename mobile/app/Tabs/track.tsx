@@ -1,7 +1,6 @@
 import * as Location from 'expo-location';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  Alert,
   FlatList,
   Linking,
   StyleSheet,
@@ -10,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
+import { useToast } from '../../components/ToastContext';
 
 // Import SOS service
 import { sosService } from '../services';
@@ -23,13 +23,14 @@ export default function TrackScreen() {
   const [selectedType, setSelectedType] = useState<string>('hospital');
   const [loading, setLoading] = useState(false);
   const mapRef = useRef<MapView>(null);
+  const { showToast } = useToast();
 
   // Get user location
   useEffect(() => {
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission Required', 'Location access is needed');
+        showToast({ type: 'warning', title: 'Permission Required', message: 'Location access is needed' });
         return;
       }
       const loc = await Location.getCurrentPositionAsync({});
@@ -55,7 +56,7 @@ export default function TrackScreen() {
       setPlaces(results);
       if (results.length > 0) zoomToMarkers(results);
     } catch (error: any) {
-      Alert.alert('Error', error.msg || 'Unable to fetch nearby places');
+      showToast({ type: 'error', title: 'Error', message: error.msg || 'Unable to fetch nearby places' });
     } finally {
       setLoading(false);
     }
@@ -76,12 +77,12 @@ export default function TrackScreen() {
   const callPlace = async (placeId: string) => {
     try {
       const phone = await sosService.getPlacePhoneNumber(placeId);
-      if (!phone) return Alert.alert('Phone not available');
+      if (!phone) return showToast({ type: 'info', title: 'Unavailable', message: 'Phone number not available for this place' });
 
       const supported = await Linking.canOpenURL(`tel:${phone}`);
       if (supported) Linking.openURL(`tel:${phone}`);
     } catch {
-      Alert.alert('Error', 'Call failed');
+      showToast({ type: 'error', title: 'Error', message: 'Call failed' });
     }
   };
 
@@ -94,7 +95,7 @@ export default function TrackScreen() {
     // Send SOS to backend using sosService
     try {
       await sosService.sendSOSAlert({ user: 'User1', message: 'SOS activated!' });
-      Alert.alert('SOS Sent', 'Emergency reported to system');
+      showToast({ type: 'success', title: 'SOS Sent', message: 'Emergency reported to system' });
     } catch (error: any) {
       console.error('Backend error:', error);
     }

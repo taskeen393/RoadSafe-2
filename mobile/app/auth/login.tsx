@@ -5,7 +5,6 @@ import { useRouter } from 'expo-router';
 import React, { useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   Dimensions,
   KeyboardAvoidingView,
@@ -20,6 +19,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { authService } from '../services';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../../components/ToastContext';
 
 const { width } = Dimensions.get('window');
 
@@ -40,6 +40,7 @@ export default function Login() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { login: loginContext } = useAuth();
+  const { showToast } = useToast();
   const scrollRef = useRef<ScrollView>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -54,7 +55,7 @@ export default function Login() {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Error', 'Please fill all fields');
+      showToast({ type: 'warning', title: 'Missing Fields', message: 'Please fill all fields' });
       return;
     }
     setLoading(true);
@@ -69,7 +70,7 @@ export default function Login() {
       await loginContext(response.token, user);
       router.replace('/Tabs');
     } catch (error: any) {
-      Alert.alert('Login failed', error?.msg || error?.message || 'Invalid credentials');
+      showToast({ type: 'error', title: 'Login Failed', message: error?.msg || error?.message || 'Invalid credentials' });
     } finally {
       setLoading(false);
     }

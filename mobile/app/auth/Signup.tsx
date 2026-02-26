@@ -5,7 +5,6 @@ import { useRouter } from 'expo-router';
 import React, { useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Dimensions,
   KeyboardAvoidingView,
   Platform,
@@ -19,6 +18,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { authService } from '../services';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../../components/ToastContext';
 
 const { width } = Dimensions.get('window');
 
@@ -39,6 +39,7 @@ export default function Signup() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { login: loginContext } = useAuth();
+  const { showToast } = useToast();
   const scrollRef = useRef<ScrollView>(null);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -57,13 +58,13 @@ export default function Signup() {
 
   const handleSignup = async () => {
     if (!name || !email || !password || !confirmPassword) {
-      return Alert.alert('Error', 'Please fill all fields');
+      return showToast({ type: 'warning', title: 'Missing Fields', message: 'Please fill all fields' });
     }
     if (password !== confirmPassword) {
-      return Alert.alert('Error', 'Passwords do not match');
+      return showToast({ type: 'error', title: 'Mismatch', message: 'Passwords do not match' });
     }
     if (password.length < 6) {
-      return Alert.alert('Error', 'Password must be at least 6 characters');
+      return showToast({ type: 'warning', title: 'Weak Password', message: 'Password must be at least 6 characters' });
     }
 
     setLoading(true);
@@ -76,11 +77,11 @@ export default function Signup() {
       };
       await authService.saveAuthCredentials(response.token, user);
       await loginContext(response.token, user);
-      Alert.alert('Success', 'Account created!');
+      showToast({ type: 'success', title: 'Account Created!', message: 'Welcome to RoadSafe' });
       router.replace('/Tabs');
     } catch (error: any) {
       const message = error?.msg || error?.message || 'Network error';
-      Alert.alert('Signup failed', message);
+      showToast({ type: 'error', title: 'Signup Failed', message });
     } finally {
       setLoading(false);
     }

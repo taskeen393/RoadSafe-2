@@ -101,101 +101,71 @@ function parseMaybeJsonArray(value) {
   return [];
 }
 
-// Get all reports
+// Get reports (supports pagination via ?page=1&limit=10)
 export const getReports = async (req, res) => {
   try {
     const mongoose = (await import('mongoose')).default;
-    const reports = await Report.find().sort({ _id: -1 });
-    
+
+    // Pagination params
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 0)); // 0 = no limit (backwards compat)
+    const usePagination = !!req.query.page || !!req.query.limit;
+
+    const total = usePagination ? await Report.countDocuments() : undefined;
+    const skip = usePagination ? (page - 1) * (limit || 10) : 0;
+    const effectiveLimit = usePagination ? (limit || 10) : 0; // 0 means no limit
+
+    let query = Report.find().sort({ _id: -1 });
+    if (usePagination) {
+      query = query.skip(skip).limit(effectiveLimit);
+    }
+    const reports = await query;
+
     // Get user profile images for all unique userIds
     const userIds = [...new Set(reports.map(r => r.userId).filter(Boolean))];
-    
-    console.log('📊 Fetching reports:', {
-      reportCount: reports.length,
-      uniqueUserIds: userIds.length,
-      userIds: userIds.slice(0, 5), // Log first 5
-    });
-    
+
+    // Build userId -> profileImage map
+    let userProfileMap = {};
     if (userIds.length > 0) {
       const User = (await import('../models/User.js')).default;
-      
-      // Convert string userIds to ObjectIds for query (userId is stored as String in Report)
       const objectIds = userIds
         .filter(id => mongoose.Types.ObjectId.isValid(id))
         .map(id => new mongoose.Types.ObjectId(id));
-      
+
       if (objectIds.length > 0) {
         const users = await User.find({ _id: { $in: objectIds } }).select('_id profileImage');
-        
-        console.log('👤 Found users:', {
-          userCount: users.length,
-          usersWithProfile: users.filter(u => u.profileImage).length,
-        });
-        
-        // Create map: userId string -> profileImage (only for users with images)
-        const userProfileMap = {};
         users.forEach(u => {
           const idStr = u._id.toString();
-          // Only add to map if profileImage exists and is not null/empty
           if (u.profileImage && u.profileImage.trim() !== '') {
             userProfileMap[idStr] = u.profileImage;
-            console.log(`✅ User ${idStr} has profile image: ${u.profileImage}`);
-          } else {
-            console.log(`⚠️ User ${idStr} has NO profile image (value: ${u.profileImage})`);
           }
         });
-        
-        console.log('📋 User profile map (only users with images):', userProfileMap);
-        console.log('🔍 Looking for userIds in reports:', userIds);
-        console.log('🔑 Map keys (users with profile images):', Object.keys(userProfileMap));
-        
-        // Add profileImage to each report
-        const reportsWithProfiles = reports.map(report => {
-          const reportObj = report.toObject();
-          const reportUserId = report.userId ? String(report.userId).trim() : null;
-          
-          // Always set userProfileImage field
-          if (reportUserId && userProfileMap[reportUserId]) {
-            // User has a profile image
-            reportObj.userProfileImage = userProfileMap[reportUserId];
-            console.log(`✅ Report ${report._id}: Added profile image for user ${reportUserId}: ${userProfileMap[reportUserId]}`);
-          } else {
-            // User doesn't have a profile image or not found
-            reportObj.userProfileImage = null;
-            if (reportUserId) {
-              if (userProfileMap.hasOwnProperty(reportUserId)) {
-                console.log(`ℹ️ Report ${report._id}: User ${reportUserId} exists but has no profile image`);
-              } else {
-                console.log(`⚠️ Report ${report._id}: User ${reportUserId} not found in userProfileMap. Available keys:`, Object.keys(userProfileMap));
-              }
-            }
-          }
-          
-          return reportObj;
-        });
-        
-        res.status(200).json(reportsWithProfiles);
-      } else {
-        // Invalid ObjectIds, return reports without profile images
-        const reportsArray = reports.map(r => {
-          const obj = r.toObject();
-          obj.userProfileImage = null; // Explicitly set to null
-          return obj;
-        });
-        res.status(200).json(reportsArray);
       }
-    } else {
-      // No userIds, just return reports as-is but with userProfileImage field
-      const reportsArray = reports.map(r => {
-        const obj = r.toObject();
-        obj.userProfileImage = null; // Explicitly set to null
-        return obj;
-      });
-      res.status(200).json(reportsArray);
     }
+
+    // Add profileImage to each report
+    const reportsWithProfiles = reports.map(report => {
+      const reportObj = report.toObject();
+      const reportUserId = report.userId ? String(report.userId).trim() : null;
+      reportObj.userProfileImage = (reportUserId && userProfileMap[reportUserId]) ? userProfileMap[reportUserId] : null;
+      return reportObj;
+    });
+
+    // If pagination was requested, return paginated envelope
+    if (usePagination) {
+      return res.status(200).json({
+        reports: reportsWithProfiles,
+        page,
+        limit: effectiveLimit,
+        total,
+        hasMore: skip + reportsWithProfiles.length < total,
+      });
+    }
+
+    // Backwards compatibility: return flat array if no pagination params
+    res.status(200).json(reportsWithProfiles);
   } catch (error) {
     console.error("Get reports error:", error.message);
-    console.error("Error stack:", error.stack);
     res.status(500).json({ message: error.message });
   }
 };
@@ -203,18 +173,18 @@ export const addReport = async (req, res) => {
   try {
     const uploadedImageUrls = [];
     const uploadedVideoUrls = [];
-    
+
     // Handle files from multer - can be array or fields object
     let imageFiles = [];
     let videoFiles = [];
-    
+
     console.log('📥 Received files:', {
       hasFiles: !!req.files,
       filesType: Array.isArray(req.files) ? 'array' : typeof req.files,
       filesKeys: req.files && !Array.isArray(req.files) ? Object.keys(req.files) : 'N/A',
       filesLength: Array.isArray(req.files) ? req.files.length : (req.files ? Object.keys(req.files).length : 0),
     });
-    
+
     if (req.files) {
       if (Array.isArray(req.files)) {
         // Single field upload (backwards compatibility)
@@ -238,10 +208,10 @@ export const addReport = async (req, res) => {
     }
 
     const cloudinaryConfig = initCloudinary();
-    
+
     if ((imageFiles.length > 0 || videoFiles.length > 0) && !cloudinaryConfig) {
-      return res.status(400).json({ 
-        message: 'Media upload requires Cloudinary configuration. Please configure CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET in backend/.env' 
+      return res.status(400).json({
+        message: 'Media upload requires Cloudinary configuration. Please configure CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET in backend/.env'
       });
     }
 
@@ -268,8 +238,8 @@ export const addReport = async (req, res) => {
           if (result?.secure_url) uploadedImageUrls.push(result.secure_url);
         } catch (uploadError) {
           console.error('Cloudinary image upload error:', uploadError);
-          return res.status(500).json({ 
-            message: 'Failed to upload image to Cloudinary. Please check your Cloudinary configuration.' 
+          return res.status(500).json({
+            message: 'Failed to upload image to Cloudinary. Please check your Cloudinary configuration.'
           });
         }
       }
@@ -287,7 +257,7 @@ export const addReport = async (req, res) => {
           mimetype: file.mimetype,
           size: file.size,
         });
-        
+
         try {
           const result = await new Promise((resolve, reject) => {
             const stream = cloudinary.uploader.upload_stream(
@@ -312,8 +282,8 @@ export const addReport = async (req, res) => {
           }
         } catch (uploadError) {
           console.error(`❌ Cloudinary video ${i + 1} upload error:`, uploadError);
-          return res.status(500).json({ 
-            message: 'Failed to upload video to Cloudinary. Please check your Cloudinary configuration.' 
+          return res.status(500).json({
+            message: 'Failed to upload video to Cloudinary. Please check your Cloudinary configuration.'
           });
         }
       }
@@ -325,7 +295,7 @@ export const addReport = async (req, res) => {
     // Backwards compatible: if client still sends imageUris/videoUris in body, accept them if no files uploaded
     const imageUrisFromBody = parseMaybeJsonArray(req.body.imageUris);
     const videoUrisFromBody = parseMaybeJsonArray(req.body.videoUris);
-    
+
     const finalImageUris = uploadedImageUrls.length > 0 ? uploadedImageUrls : imageUrisFromBody;
     const finalVideoUris = uploadedVideoUrls.length > 0 ? uploadedVideoUrls : videoUrisFromBody;
 
@@ -364,7 +334,7 @@ export const addReport = async (req, res) => {
 export const updateReport = async (req, res) => {
   try {
     const report = await Report.findById(req.params.id);
-    
+
     if (!report) {
       return res.status(404).json({ message: 'Report not found' });
     }
@@ -376,11 +346,11 @@ export const updateReport = async (req, res) => {
 
     const uploadedImageUrls = [];
     const uploadedVideoUrls = [];
-    
+
     // Handle files from multer - can be array or fields object
     let imageFiles = [];
     let videoFiles = [];
-    
+
     if (req.files) {
       if (Array.isArray(req.files)) {
         // Single field upload (backwards compatibility)
@@ -394,10 +364,10 @@ export const updateReport = async (req, res) => {
     }
 
     const cloudinaryConfig = initCloudinary();
-    
+
     if ((imageFiles.length > 0 || videoFiles.length > 0) && !cloudinaryConfig) {
-      return res.status(400).json({ 
-        message: 'Media upload requires Cloudinary configuration. Please configure CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET in backend/.env' 
+      return res.status(400).json({
+        message: 'Media upload requires Cloudinary configuration. Please configure CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET in backend/.env'
       });
     }
 
@@ -424,8 +394,8 @@ export const updateReport = async (req, res) => {
           if (result?.secure_url) uploadedImageUrls.push(result.secure_url);
         } catch (uploadError) {
           console.error('Cloudinary image upload error:', uploadError);
-          return res.status(500).json({ 
-            message: 'Failed to upload image to Cloudinary. Please check your Cloudinary configuration.' 
+          return res.status(500).json({
+            message: 'Failed to upload image to Cloudinary. Please check your Cloudinary configuration.'
           });
         }
       }
@@ -455,8 +425,8 @@ export const updateReport = async (req, res) => {
           if (result?.secure_url) uploadedVideoUrls.push(result.secure_url);
         } catch (uploadError) {
           console.error('Cloudinary video upload error:', uploadError);
-          return res.status(500).json({ 
-            message: 'Failed to upload video to Cloudinary. Please check your Cloudinary configuration.' 
+          return res.status(500).json({
+            message: 'Failed to upload video to Cloudinary. Please check your Cloudinary configuration.'
           });
         }
       }
@@ -465,7 +435,7 @@ export const updateReport = async (req, res) => {
     // Determine which old files to delete
     const oldImageUris = Array.isArray(report.imageUris) ? report.imageUris : [];
     const oldVideoUris = Array.isArray(report.videoUris) ? report.videoUris : [];
-    
+
     let newImageUris = oldImageUris;
     let newVideoUris = oldVideoUris;
 
@@ -476,7 +446,7 @@ export const updateReport = async (req, res) => {
     if (req.body.location !== undefined) updateData.location = req.body.location;
     if (req.body.lat !== undefined) updateData.lat = toNumber(req.body.lat);
     if (req.body.lon !== undefined) updateData.lon = toNumber(req.body.lon);
-    
+
     if (uploadedImageUrls.length > 0) {
       // Replace existing images with new ones
       newImageUris = uploadedImageUrls;
@@ -486,7 +456,7 @@ export const updateReport = async (req, res) => {
       newImageUris = parseMaybeJsonArray(req.body.imageUris);
       updateData.imageUris = newImageUris;
     }
-    
+
     if (uploadedVideoUrls.length > 0) {
       // Replace existing videos with new ones
       newVideoUris = uploadedVideoUrls;
@@ -533,7 +503,7 @@ export const updateReport = async (req, res) => {
 export const deleteReport = async (req, res) => {
   try {
     const report = await Report.findById(req.params.id);
-    
+
     if (!report) {
       return res.status(404).json({ message: 'Report not found' });
     }
@@ -561,7 +531,7 @@ export const deleteReport = async (req, res) => {
 
     // Delete the report from database
     await Report.findByIdAndDelete(req.params.id);
-    
+
     console.log(`✅ Report ${req.params.id} deleted successfully`);
     res.status(200).json({ message: 'Report deleted successfully' });
   } catch (error) {
