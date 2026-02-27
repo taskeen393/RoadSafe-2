@@ -1,5 +1,5 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Keyboard,
@@ -12,26 +12,32 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-
-// Import chatbot service
+import { COLORS, RADIUS, SPACING } from '../../constants/globalStyles';
 import { chatbotService } from '../services';
 
 type Message = {
   id: number;
   text: string;
   sender: 'user' | 'bot';
+  isError?: boolean;
+};
+
+const WELCOME_MESSAGE: Message = {
+  id: 0,
+  text: 'Hello! I am your Road Safety Assistant. Ask me anything about traffic rules, driving safety, road signs, or emergency guidance.',
+  sender: 'bot',
 };
 
 export default function ChatbotScreen() {
   const [message, setMessage] = useState('');
-  const [chat, setChat] = useState<Message[]>([]);
+  const [chat, setChat] = useState<Message[]>([WELCOME_MESSAGE]);
   const [loading, setLoading] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
-  const handleSend = async () => {
-    if (!message.trim()) return;
+  const handleSend = useCallback(async () => {
+    if (!message.trim() || loading) return;
 
-    const userText = message;
+    const userText = message.trim();
     setChat(prev => [...prev, { id: Date.now(), text: userText, sender: 'user' }]);
     setMessage('');
     Keyboard.dismiss();
@@ -39,25 +45,70 @@ export default function ChatbotScreen() {
 
     try {
       const response = await chatbotService.sendMessage(userText);
-
       setChat(prev => [
         ...prev,
-        { id: Date.now() + 1, text: response.bot || 'No reply', sender: 'bot' }
+        {
+          id: Date.now() + 1,
+          text: response.reply || 'No reply received.',
+          sender: 'bot',
+          isError: !response.success,
+        },
       ]);
-
     } catch (err: any) {
-      console.log('CHATBOT ERROR:', err);
       setChat(prev => [
         ...prev,
-        { id: Date.now() + 1, text: 'Server not reachable', sender: 'bot' }
+        {
+          id: Date.now() + 1,
+          text: 'Unable to reach the server. Tap to retry.',
+          sender: 'bot',
+          isError: true,
+        },
       ]);
     } finally {
       setLoading(false);
     }
-  };
+  }, [message, loading]);
+
+  const handleRetry = useCallback(async (errorMsgId: number) => {
+    const errorIndex = chat.findIndex(m => m.id === errorMsgId);
+    if (errorIndex <= 0) return;
+
+    const userMsg = chat[errorIndex - 1];
+    if (userMsg.sender !== 'user') return;
+
+    setChat(prev => prev.filter(m => m.id !== errorMsgId));
+    setLoading(true);
+
+    try {
+      const response = await chatbotService.sendMessage(userMsg.text);
+      setChat(prev => [
+        ...prev,
+        {
+          id: Date.now(),
+          text: response.reply || 'No reply received.',
+          sender: 'bot',
+          isError: !response.success,
+        },
+      ]);
+    } catch {
+      setChat(prev => [
+        ...prev,
+        {
+          id: Date.now(),
+          text: 'Still unable to connect. Please check your network.',
+          sender: 'bot',
+          isError: true,
+        },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  }, [chat]);
 
   useEffect(() => {
-    scrollViewRef.current?.scrollToEnd({ animated: true });
+    setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 100);
   }, [chat]);
 
   return (
@@ -65,57 +116,81 @@ export default function ChatbotScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
     >
+      {/* Header */}
       <View style={styles.header}>
-        <MaterialCommunityIcons name="robot" size={48} color="#2E8B57" />
-        <Text style={styles.title}>ChatBot</Text>
+        <View style={styles.botAvatar}>
+          <MaterialCommunityIcons name="robot-happy" size={28} color={COLORS.textWhite} />
+        </View>
+        <Text style={styles.title}>Road Safety AI</Text>
+        <Text style={styles.subtitle}>Ask me anything about road safety</Text>
       </View>
 
+      {/* Chat Area */}
       <ScrollView
         ref={scrollViewRef}
         style={styles.chatArea}
-        contentContainerStyle={{ padding: 15 }}
+        contentContainerStyle={{ padding: SPACING.lg, paddingBottom: SPACING.xxl }}
         keyboardShouldPersistTaps="handled"
       >
-        {chat.length === 0 && (
-          <Text style={styles.placeholder}>Type a message to start chatting</Text>
-        )}
-
         {chat.map(item => (
-          <View
+          <TouchableOpacity
             key={item.id}
+            activeOpacity={item.isError ? 0.6 : 1}
+            onPress={item.isError ? () => handleRetry(item.id) : undefined}
+            disabled={!item.isError || loading}
             style={[
               styles.bubble,
-              item.sender === 'user' ? styles.userBubble : styles.botBubble
+              item.sender === 'user' ? styles.userBubble : styles.botBubble,
+              item.isError && styles.errorBubble,
             ]}
           >
             <Text
               style={[
                 styles.text,
-                item.sender === 'user' ? styles.userText : styles.botText
+                item.sender === 'user' ? styles.userText : styles.botText,
+                item.isError && styles.errorText,
               ]}
             >
               {item.text}
             </Text>
-          </View>
+            {item.isError && (
+              <View style={styles.retryHint}>
+                <MaterialCommunityIcons name="refresh" size={14} color={COLORS.accentRed} />
+                <Text style={styles.retryLabel}>Tap to retry</Text>
+              </View>
+            )}
+          </TouchableOpacity>
         ))}
 
         {loading && (
-          <View style={styles.botBubble}>
-            <ActivityIndicator color="#fff" />
+          <View style={[styles.bubble, styles.botBubble, { paddingVertical: 14 }]}>
+            <View style={styles.typingRow}>
+              <ActivityIndicator color={COLORS.textWhite} size="small" />
+              <Text style={styles.typingText}>Thinking...</Text>
+            </View>
           </View>
         )}
       </ScrollView>
 
+      {/* Input Bar */}
       <View style={styles.inputContainer}>
         <TextInput
           style={styles.input}
-          placeholder="Type a message..."
+          placeholder="Ask about road safety..."
+          placeholderTextColor={COLORS.textLight}
           value={message}
           onChangeText={setMessage}
           onSubmitEditing={handleSend}
+          returnKeyType="send"
+          maxLength={500}
+          editable={!loading}
         />
-        <TouchableOpacity style={styles.sendBtn} onPress={handleSend}>
-          <MaterialCommunityIcons name="send" size={22} color="#fff" />
+        <TouchableOpacity
+          style={[styles.sendBtn, (!message.trim() || loading) && styles.sendBtnDisabled]}
+          onPress={handleSend}
+          disabled={!message.trim() || loading}
+        >
+          <MaterialCommunityIcons name="send" size={20} color={COLORS.textWhite} />
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -123,18 +198,123 @@ export default function ChatbotScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#E8F5E9' },
-  header: { alignItems: 'center', paddingVertical: 20, backgroundColor: '#F9FFF9' },
-  title: { fontSize: 26, fontWeight: 'bold', color: '#2E8B57', marginTop: 5 },
-  chatArea: { flex: 1 },
-  placeholder: { textAlign: 'center', color: '#555', marginTop: 120, fontStyle: 'italic' },
-  bubble: { padding: 12, borderRadius: 18, marginVertical: 6, maxWidth: '75%' },
-  userBubble: { alignSelf: 'flex-end', backgroundColor: '#C8E6C9' },
-  botBubble: { alignSelf: 'flex-start', backgroundColor: '#2E7D32' },
-  text: { fontSize: 16 },
-  userText: { color: '#1B5E20' },
-  botText: { color: '#fff' },
-  inputContainer: { flexDirection: 'row', padding: 10, backgroundColor: '#F9FFF9', alignItems: 'center' },
-  input: { flex: 1, backgroundColor: '#F1F8E9', borderRadius: 25, paddingHorizontal: 18, paddingVertical: 10, fontSize: 16 },
-  sendBtn: { marginLeft: 10, backgroundColor: '#2E7D32', padding: 12, borderRadius: 50 },
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.bgScreen,
+  },
+  header: {
+    alignItems: 'center',
+    paddingVertical: SPACING.xl,
+    backgroundColor: COLORS.bgCard,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.borderLight,
+  },
+  botAvatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: COLORS.emerald,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: SPACING.sm,
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: COLORS.emeraldDark,
+  },
+  subtitle: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    marginTop: 2,
+  },
+  chatArea: {
+    flex: 1,
+  },
+  bubble: {
+    padding: SPACING.md,
+    borderRadius: RADIUS.lg,
+    marginVertical: SPACING.xs,
+    maxWidth: '78%',
+  },
+  userBubble: {
+    alignSelf: 'flex-end',
+    backgroundColor: COLORS.emerald,
+    borderBottomRightRadius: SPACING.xs,
+  },
+  botBubble: {
+    alignSelf: 'flex-start',
+    backgroundColor: COLORS.emeraldDark,
+    borderBottomLeftRadius: SPACING.xs,
+  },
+  errorBubble: {
+    backgroundColor: '#FEE2E2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  text: {
+    fontSize: 15,
+    lineHeight: 21,
+  },
+  userText: {
+    color: COLORS.textWhite,
+  },
+  botText: {
+    color: COLORS.textWhite,
+  },
+  errorText: {
+    color: COLORS.accentRed,
+  },
+  retryHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+    gap: 4,
+  },
+  retryLabel: {
+    fontSize: 12,
+    color: COLORS.accentRed,
+    fontWeight: '600',
+  },
+  typingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  typingText: {
+    color: COLORS.textWhite,
+    fontSize: 13,
+    fontStyle: 'italic',
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    padding: SPACING.md,
+    backgroundColor: COLORS.bgCard,
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: COLORS.borderLight,
+  },
+  input: {
+    flex: 1,
+    backgroundColor: COLORS.bgInput,
+    borderRadius: RADIUS.xl,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: Platform.OS === 'ios' ? 12 : 10,
+    fontSize: 15,
+    color: COLORS.textPrimary,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  sendBtn: {
+    marginLeft: SPACING.sm,
+    backgroundColor: COLORS.emerald,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  sendBtnDisabled: {
+    opacity: 0.5,
+  },
 });

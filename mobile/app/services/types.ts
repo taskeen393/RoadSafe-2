@@ -56,12 +56,13 @@ export interface ReportResponse {
 
 // ============ CHATBOT TYPES ============
 export interface ChatbotRequest {
-    user: string;
     message: string;
+    country?: string;
 }
 
 export interface ChatbotResponse {
-    bot: string;
+    success: boolean;
+    reply: string;
 }
 
 // ============ SOS TYPES ============
