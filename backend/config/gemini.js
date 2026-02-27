@@ -10,7 +10,7 @@ dotenv.config();
 
 const geminiConfig = {
     apiKey: process.env.GEMINI_API_KEY,
-    model: 'gemini-2.0-flash',
+    model: 'gemini-2.5-flash',
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta/models',
     maxOutputTokens: 300,
     temperature: 0.7,
