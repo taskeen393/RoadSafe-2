@@ -371,7 +371,7 @@ export default function AccountScreen() {
       </ScrollView>
 
       {/* ─── Edit Profile Modal ─── */}
-      <Modal visible={editModalVisible} transparent animationType="slide">
+      <Modal visible={editModalVisible} transparent animationType="slide" onRequestClose={() => setEditModalVisible(false)}>
         <KeyboardAvoidingView
           style={{ flex: 1 }}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}

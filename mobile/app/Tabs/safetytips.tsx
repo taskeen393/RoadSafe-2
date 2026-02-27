@@ -218,7 +218,7 @@ export default function SafetyTips() {
       </ScrollView>
 
       {/* ─── Emergency Contacts Modal ─── */}
-      <Modal visible={contactsVisible} transparent animationType="none" statusBarTranslucent>
+      <Modal visible={contactsVisible} transparent animationType="none" statusBarTranslucent onRequestClose={() => setContactsVisible(false)}>
         <View style={styles.modalOverlay}>
           <TouchableWithoutFeedback onPress={() => setContactsVisible(false)}>
             <View style={styles.modalBackdrop} />

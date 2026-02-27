@@ -329,7 +329,7 @@ export default function TripScreen() {
 
       {/* ─── Review Map Modal ─── */}
       {selectedReview && (
-        <Modal visible={modalVisible} animationType="slide">
+        <Modal visible={modalVisible} animationType="slide" onRequestClose={() => setModalVisible(false)}>
           <View style={{ flex: 1 }}>
             <MapView
               style={{ flex: 1 }}
@@ -346,7 +346,7 @@ export default function TripScreen() {
       )}
 
       {/* ─── Fullscreen Media Modal ─── */}
-      <Modal visible={mediaModalVisible} animationType="slide" transparent={false}>
+      <Modal visible={mediaModalVisible} animationType="slide" transparent={false} onRequestClose={() => setMediaModalVisible(false)}>
         <View style={{ flex: 1, backgroundColor: '#000' }}>
           <TouchableOpacity style={styles.mediaClose} onPress={() => setMediaModalVisible(false)}>
             <Ionicons name="close" size={22} color="#fff" />

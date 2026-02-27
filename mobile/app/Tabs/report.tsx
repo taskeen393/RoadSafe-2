@@ -311,7 +311,7 @@ export default function ReportScreen({ navigation }: any) {
       </ScrollView>
 
       {/* Map Modal */}
-      <Modal visible={mapVisible} animationType="slide" transparent={false}>
+      <Modal visible={mapVisible} animationType="slide" transparent={false} onRequestClose={() => setMapVisible(false)}>
         <View style={{ flex: 1 }}>
           <MapView
             style={{ flex: 1 }}

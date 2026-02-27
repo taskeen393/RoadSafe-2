@@ -92,7 +92,7 @@ export default function ChatbotFAB() {
             </Animated.View>
 
             {/* ─── Chatbot Modal ─── */}
-            <Modal visible={visible} animationType="slide" transparent>
+            <Modal visible={visible} animationType="slide" transparent onRequestClose={() => setVisible(false)}>
                 <View style={styles.modalOverlay}>
                     <KeyboardAvoidingView
                         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}

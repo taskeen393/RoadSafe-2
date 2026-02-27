@@ -464,7 +464,7 @@ export default function FeedScreen() {
       />
 
       {/* ─── Media Modal ─── */}
-      <Modal visible={modalVisible} animationType="slide" transparent={false}>
+      <Modal visible={modalVisible} animationType="slide" transparent={false} onRequestClose={() => setModalVisible(false)}>
         <View style={{ flex: 1, backgroundColor: '#000' }}>
           <TouchableOpacity style={styles.closeBtn} onPress={() => setModalVisible(false)}>
             <Ionicons name="close" size={24} color="#fff" />
@@ -489,7 +489,7 @@ export default function FeedScreen() {
       </Modal>
 
       {/* ─── Map Modal ─── */}
-      <Modal visible={mapVisible} animationType="slide">
+      <Modal visible={mapVisible} animationType="slide" onRequestClose={() => setMapVisible(false)}>
         <View style={{ flex: 1 }}>
           <MapView
             style={{ flex: 1 }}
@@ -504,7 +504,7 @@ export default function FeedScreen() {
       </Modal>
 
       {/* ─── Edit Modal ─── */}
-      <Modal visible={editModalVisible} transparent animationType="fade">
+      <Modal visible={editModalVisible} transparent animationType="fade" onRequestClose={() => setEditModalVisible(false)}>
         <View style={styles.editOverlay}>
           <View style={styles.editCard}>
             <View style={styles.editHeaderRow}>
