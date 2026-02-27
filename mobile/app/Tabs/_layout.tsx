@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ReportProvider from '../context/reportcontent';
 import ChatbotFAB from '../../components/ChatbotFAB';
 import { useToast } from '../../components/ToastContext';
+import { useTheme } from '../context/ThemeContext';
 
 import {
   Ionicons,
@@ -17,6 +18,7 @@ import { useFocusEffect } from '@react-navigation/native';
 export default function Layout() {
   const insets = useSafeAreaInsets();
   const { showToast } = useToast();
+  const { colors, isDark } = useTheme();
   const [isAuthChecked, setIsAuthChecked] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
@@ -49,26 +51,24 @@ export default function Layout() {
 
   return (
     <ReportProvider>
-      {/* Status bar — dark icons visible on light bg */}
-      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
-      {/* Light background to match dashboard */}
-      <View style={{ flex: 1, backgroundColor: '#F4F7F4' }}>
+      <StatusBar barStyle={colors.statusBar} backgroundColor="transparent" translucent />
+      <View style={{ flex: 1, backgroundColor: colors.bg }}>
         <Tabs
           screenOptions={{
             headerShown: false,
-            tabBarActiveTintColor: '#1A4D2E',
-            tabBarInactiveTintColor: '#9CA3AF',
+            tabBarActiveTintColor: colors.tabBarActive,
+            tabBarInactiveTintColor: colors.tabBarInactive,
             tabBarStyle: {
-              backgroundColor: '#FFFFFF',
+              backgroundColor: colors.tabBarBg,
               height: Platform.OS === 'android' ? 68 : 62,
               paddingBottom: insets.bottom + 4,
               marginBottom: 8,
               marginHorizontal: 14,
               borderTopWidth: 0,
               borderRadius: 28,
-              shadowColor: '#1A4D2E',
+              shadowColor: colors.tabBarShadow,
               shadowOffset: { width: 0, height: 6 },
-              shadowOpacity: 0.1,
+              shadowOpacity: isDark ? 0.3 : 0.1,
               shadowRadius: 18,
               elevation: 10,
             },

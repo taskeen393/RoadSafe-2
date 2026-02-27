@@ -12,7 +12,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { COLORS, RADIUS, SPACING } from '../../constants/globalStyles';
+import { RADIUS, SPACING } from '../../constants/globalStyles';
+import { useTheme } from '../context/ThemeContext';
 import { chatbotService } from '../services';
 
 type Message = {
@@ -22,175 +23,88 @@ type Message = {
   isError?: boolean;
 };
 
-const WELCOME_MESSAGE: Message = {
-  id: 0,
-  text: 'Hello! I am your Road Safety Assistant. Ask me anything about traffic rules, driving safety, road signs, or emergency guidance.',
-  sender: 'bot',
-};
-
 export default function ChatbotScreen() {
-  const [message, setMessage] = useState('');
-  const [chat, setChat] = useState<Message[]>([WELCOME_MESSAGE]);
+  const { colors: G, isDark } = useTheme();
+  const [messages, setMessages] = useState<Message[]>([
+    { id: 1, text: "Hi! I'm your road safety assistant. Ask me about safe driving, weather hazards, or emergency contacts.", sender: 'bot' },
+  ]);
+  const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const scrollViewRef = useRef<ScrollView>(null);
-
-  const handleSend = useCallback(async () => {
-    if (!message.trim() || loading) return;
-
-    const userText = message.trim();
-    setChat(prev => [...prev, { id: Date.now(), text: userText, sender: 'user' }]);
-    setMessage('');
-    Keyboard.dismiss();
-    setLoading(true);
-
-    try {
-      const response = await chatbotService.sendMessage(userText);
-      setChat(prev => [
-        ...prev,
-        {
-          id: Date.now() + 1,
-          text: response.reply || 'No reply received.',
-          sender: 'bot',
-          isError: !response.success,
-        },
-      ]);
-    } catch (err: any) {
-      setChat(prev => [
-        ...prev,
-        {
-          id: Date.now() + 1,
-          text: 'Unable to reach the server. Tap to retry.',
-          sender: 'bot',
-          isError: true,
-        },
-      ]);
-    } finally {
-      setLoading(false);
-    }
-  }, [message, loading]);
-
-  const handleRetry = useCallback(async (errorMsgId: number) => {
-    const errorIndex = chat.findIndex(m => m.id === errorMsgId);
-    if (errorIndex <= 0) return;
-
-    const userMsg = chat[errorIndex - 1];
-    if (userMsg.sender !== 'user') return;
-
-    setChat(prev => prev.filter(m => m.id !== errorMsgId));
-    setLoading(true);
-
-    try {
-      const response = await chatbotService.sendMessage(userMsg.text);
-      setChat(prev => [
-        ...prev,
-        {
-          id: Date.now(),
-          text: response.reply || 'No reply received.',
-          sender: 'bot',
-          isError: !response.success,
-        },
-      ]);
-    } catch {
-      setChat(prev => [
-        ...prev,
-        {
-          id: Date.now(),
-          text: 'Still unable to connect. Please check your network.',
-          sender: 'bot',
-          isError: true,
-        },
-      ]);
-    } finally {
-      setLoading(false);
-    }
-  }, [chat]);
+  const scrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
-    setTimeout(() => {
-      scrollViewRef.current?.scrollToEnd({ animated: true });
-    }, 100);
-  }, [chat]);
+    scrollRef.current?.scrollToEnd({ animated: true });
+  }, [messages]);
+
+  const sendMessage = useCallback(async () => {
+    const text = input.trim();
+    if (!text || loading) return;
+    Keyboard.dismiss();
+    setInput('');
+
+    const userMsg: Message = { id: Date.now(), text, sender: 'user' };
+    setMessages(prev => [...prev, userMsg]);
+    setLoading(true);
+
+    try {
+      const reply = await chatbotService.chat(text);
+      setMessages(prev => [...prev, { id: Date.now() + 1, text: reply, sender: 'bot' }]);
+    } catch {
+      setMessages(prev => [...prev, { id: Date.now() + 1, text: 'Something went wrong. Try again later.', sender: 'bot', isError: true }]);
+    } finally {
+      setLoading(false);
+    }
+  }, [input, loading]);
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
+      style={[styles.container, { backgroundColor: G.bg }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.botAvatar}>
-          <MaterialCommunityIcons name="robot-happy" size={28} color={COLORS.textWhite} />
-        </View>
-        <Text style={styles.title}>Road Safety AI</Text>
-        <Text style={styles.subtitle}>Ask me anything about road safety</Text>
-      </View>
-
-      {/* Chat Area */}
       <ScrollView
-        ref={scrollViewRef}
-        style={styles.chatArea}
-        contentContainerStyle={{ padding: SPACING.lg, paddingBottom: SPACING.xxl }}
+        ref={scrollRef}
+        contentContainerStyle={styles.chatList}
         keyboardShouldPersistTaps="handled"
       >
-        {chat.map(item => (
-          <TouchableOpacity
-            key={item.id}
-            activeOpacity={item.isError ? 0.6 : 1}
-            onPress={item.isError ? () => handleRetry(item.id) : undefined}
-            disabled={!item.isError || loading}
-            style={[
-              styles.bubble,
-              item.sender === 'user' ? styles.userBubble : styles.botBubble,
-              item.isError && styles.errorBubble,
-            ]}
-          >
-            <Text
-              style={[
-                styles.text,
-                item.sender === 'user' ? styles.userText : styles.botText,
-                item.isError && styles.errorText,
-              ]}
-            >
-              {item.text}
-            </Text>
-            {item.isError && (
-              <View style={styles.retryHint}>
-                <MaterialCommunityIcons name="refresh" size={14} color={COLORS.accentRed} />
-                <Text style={styles.retryLabel}>Tap to retry</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        ))}
-
-        {loading && (
-          <View style={[styles.bubble, styles.botBubble, { paddingVertical: 14 }]}>
-            <View style={styles.typingRow}>
-              <ActivityIndicator color={COLORS.textWhite} size="small" />
-              <Text style={styles.typingText}>Thinking...</Text>
+        {messages.map((msg) => {
+          const isUser = msg.sender === 'user';
+          return (
+            <View key={msg.id} style={[styles.bubble, isUser
+              ? { backgroundColor: G.darkGreen, alignSelf: 'flex-end' }
+              : { backgroundColor: G.card, alignSelf: 'flex-start', borderWidth: 1, borderColor: G.border }
+            ]}>
+              {!isUser && (
+                <MaterialCommunityIcons name="robot-outline" size={16} color={G.midGreen} style={{ marginBottom: 4 }} />
+              )}
+              <Text style={[styles.bubbleText, { color: isUser ? '#fff' : msg.isError ? G.red : G.text }]}>{msg.text}</Text>
             </View>
+          );
+        })}
+        {loading && (
+          <View style={[styles.bubble, { backgroundColor: G.card, alignSelf: 'flex-start', borderWidth: 1, borderColor: G.border }]}>
+            <ActivityIndicator size="small" color={G.midGreen} />
           </View>
         )}
       </ScrollView>
 
-      {/* Input Bar */}
-      <View style={styles.inputContainer}>
+      <View style={[styles.inputBar, { backgroundColor: G.card, borderTopColor: G.border }]}>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { backgroundColor: G.inputBg, borderColor: G.border, color: G.text }]}
           placeholder="Ask about road safety..."
-          placeholderTextColor={COLORS.textLight}
-          value={message}
-          onChangeText={setMessage}
-          onSubmitEditing={handleSend}
+          placeholderTextColor={G.sub}
+          value={input}
+          onChangeText={setInput}
           returnKeyType="send"
-          maxLength={500}
-          editable={!loading}
+          onSubmitEditing={sendMessage}
         />
         <TouchableOpacity
-          style={[styles.sendBtn, (!message.trim() || loading) && styles.sendBtnDisabled]}
-          onPress={handleSend}
-          disabled={!message.trim() || loading}
+          style={[styles.sendBtn, { backgroundColor: G.darkGreen }]}
+          onPress={sendMessage}
+          disabled={loading || !input.trim()}
+          activeOpacity={0.7}
         >
-          <MaterialCommunityIcons name="send" size={20} color={COLORS.textWhite} />
+          <MaterialCommunityIcons name="send" size={20} color="#fff" />
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -198,123 +112,27 @@ export default function ChatbotScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.bgScreen,
-  },
-  header: {
-    alignItems: 'center',
-    paddingVertical: SPACING.xl,
-    backgroundColor: COLORS.bgCard,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.borderLight,
-  },
-  botAvatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: COLORS.emerald,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: SPACING.sm,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: COLORS.emeraldDark,
-  },
-  subtitle: {
-    fontSize: 13,
-    color: COLORS.textSecondary,
-    marginTop: 2,
-  },
-  chatArea: {
-    flex: 1,
-  },
+  container: { flex: 1 },
+  chatList: { padding: SPACING.md, gap: SPACING.sm },
   bubble: {
-    padding: SPACING.md,
-    borderRadius: RADIUS.lg,
-    marginVertical: SPACING.xs,
-    maxWidth: '78%',
+    maxWidth: '80%', padding: SPACING.md, borderRadius: RADIUS.lg,
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4 },
+      android: { elevation: 1 },
+    }),
   },
-  userBubble: {
-    alignSelf: 'flex-end',
-    backgroundColor: COLORS.emerald,
-    borderBottomRightRadius: SPACING.xs,
-  },
-  botBubble: {
-    alignSelf: 'flex-start',
-    backgroundColor: COLORS.emeraldDark,
-    borderBottomLeftRadius: SPACING.xs,
-  },
-  errorBubble: {
-    backgroundColor: '#FEE2E2',
-    borderWidth: 1,
-    borderColor: '#FECACA',
-  },
-  text: {
-    fontSize: 15,
-    lineHeight: 21,
-  },
-  userText: {
-    color: COLORS.textWhite,
-  },
-  botText: {
-    color: COLORS.textWhite,
-  },
-  errorText: {
-    color: COLORS.accentRed,
-  },
-  retryHint: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 6,
-    gap: 4,
-  },
-  retryLabel: {
-    fontSize: 12,
-    color: COLORS.accentRed,
-    fontWeight: '600',
-  },
-  typingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  typingText: {
-    color: COLORS.textWhite,
-    fontSize: 13,
-    fontStyle: 'italic',
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    padding: SPACING.md,
-    backgroundColor: COLORS.bgCard,
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: COLORS.borderLight,
+  bubbleText: { fontSize: 14, lineHeight: 20 },
+  inputBar: {
+    flexDirection: 'row', alignItems: 'center', padding: SPACING.sm,
+    borderTopWidth: 1, gap: SPACING.xs,
   },
   input: {
-    flex: 1,
-    backgroundColor: COLORS.bgInput,
-    borderRadius: RADIUS.xl,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: Platform.OS === 'ios' ? 12 : 10,
+    flex: 1, borderWidth: 1, borderRadius: RADIUS.lg,
+    paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm,
     fontSize: 15,
-    color: COLORS.textPrimary,
-    borderWidth: 1,
-    borderColor: COLORS.border,
   },
   sendBtn: {
-    marginLeft: SPACING.sm,
-    backgroundColor: COLORS.emerald,
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  sendBtnDisabled: {
-    opacity: 0.5,
+    width: 44, height: 44, borderRadius: 22,
+    justifyContent: 'center', alignItems: 'center',
   },
 });

@@ -1,4 +1,4 @@
-// app/Tabs/trip.tsx — Track Trip (Light + Dark Green Theme)
+// app/Tabs/trip.tsx — Track Trip (Light + Dark Theme)
 import { AntDesign, Ionicons } from "@expo/vector-icons";
 import { ResizeMode, Video } from "expo-av";
 import * as ImagePicker from "expo-image-picker";
@@ -21,19 +21,7 @@ import {
 import MapView, { Marker, Polyline } from "react-native-maps";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useToast } from "../../components/ToastContext";
-
-// ─── Theme ───
-const G = {
-  bg: '#F4F7F4',
-  card: '#FFFFFF',
-  darkGreen: '#1A4D2E',
-  midGreen: '#2D7A4D',
-  lightGreen: '#E8F5ED',
-  text: '#1A1A1A',
-  sub: '#6B7280',
-  border: '#D1E8D9',
-  red: '#E95B5B',
-};
+import { useTheme } from '../context/ThemeContext';
 
 interface Review {
   id: string;
@@ -48,6 +36,7 @@ const { width, height } = Dimensions.get("window");
 export default function TripScreen() {
   const insets = useSafeAreaInsets();
   const { showToast } = useToast();
+  const { colors: G, isDark } = useTheme();
   const [mode, setMode] = useState<"give" | "view">("give");
   const [tracking, setTracking] = useState(false);
   const [route, setRoute] = useState<{ latitude: number; longitude: number }[]>([]);
@@ -131,9 +120,9 @@ export default function TripScreen() {
   const getItemLayout = (_: any, index: number) => ({ length: width, offset: width * index, index });
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <View style={[styles.root, { backgroundColor: G.bg, paddingTop: insets.top }]}>
       {/* ─── Hero Header ─── */}
-      <LinearGradient colors={[G.darkGreen, G.midGreen]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.hero, { paddingTop: insets.top + 12 }]}>
+      <LinearGradient colors={G.gradientHero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.hero, { paddingTop: insets.top + 12 }]}>
         <View style={styles.heroDeco} />
         <View style={styles.heroRow}>
           <View style={styles.heroIconWrap}>
@@ -162,7 +151,10 @@ export default function TripScreen() {
         {mode === 'give' && (
           <>
             {/* Map */}
-            <View style={styles.mapWrapper}>
+            <View style={[styles.mapWrapper, Platform.select({
+              ios: { shadowColor: isDark ? '#000' : G.darkGreen, shadowOffset: { width: 0, height: 4 }, shadowOpacity: isDark ? 0.3 : 0.15, shadowRadius: 12 },
+              android: { elevation: 5 },
+            })]}>
               <MapView
                 style={styles.map}
                 initialRegion={{ latitude: location?.latitude || 24.8607, longitude: location?.longitude || 67.0011, latitudeDelta: 0.05, longitudeDelta: 0.05 }}
@@ -171,7 +163,7 @@ export default function TripScreen() {
                 {route.length > 0 && <Polyline coordinates={route} strokeColor={G.darkGreen} strokeWidth={4} />}
               </MapView>
               {tracking && (
-                <View style={styles.liveTag}>
+                <View style={[styles.liveTag, { backgroundColor: G.red }]}>
                   <View style={styles.liveDot} />
                   <Text style={styles.liveText}>LIVE</Text>
                 </View>
@@ -198,9 +190,9 @@ export default function TripScreen() {
 
             {/* Review Section */}
             <View style={styles.section}>
-              <Text style={styles.sectionLabel}>Write a Review</Text>
+              <Text style={[styles.sectionLabel, { color: G.text }]}>Write a Review</Text>
               <TextInput
-                style={styles.reviewInput}
+                style={[styles.reviewInput, { backgroundColor: G.card, borderColor: G.border, color: G.text }]}
                 placeholder="How was the road? Any hazards?"
                 placeholderTextColor={G.sub}
                 value={textInput}
@@ -212,17 +204,17 @@ export default function TripScreen() {
 
               {/* Media Buttons */}
               <View style={styles.mediaRow}>
-                <TouchableOpacity style={styles.mediaBtn} onPress={pickImages}>
+                <TouchableOpacity style={[styles.mediaBtn, { backgroundColor: G.card, borderColor: G.border }]} onPress={pickImages}>
                   <View style={[styles.mediaBtnIcon, { backgroundColor: G.lightGreen }]}>
                     <Ionicons name="images" size={20} color={G.midGreen} />
                   </View>
-                  <Text style={styles.mediaBtnLabel}>Photos{images.length > 0 ? ` (${images.length})` : ''}</Text>
+                  <Text style={[styles.mediaBtnLabel, { color: G.sub }]}>Photos{images.length > 0 ? ` (${images.length})` : ''}</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.mediaBtn} onPress={pickVideos}>
-                  <View style={[styles.mediaBtnIcon, { backgroundColor: '#FEF3C7' }]}>
+                <TouchableOpacity style={[styles.mediaBtn, { backgroundColor: G.card, borderColor: G.border }]} onPress={pickVideos}>
+                  <View style={[styles.mediaBtnIcon, { backgroundColor: isDark ? '#3A2E1A' : '#FEF3C7' }]}>
                     <AntDesign name="video-camera-add" size={20} color="#D97706" />
                   </View>
-                  <Text style={styles.mediaBtnLabel}>Videos{videos.length > 0 ? ` (${videos.length})` : ''}</Text>
+                  <Text style={[styles.mediaBtnLabel, { color: G.sub }]}>Videos{videos.length > 0 ? ` (${videos.length})` : ''}</Text>
                 </TouchableOpacity>
               </View>
 
@@ -255,7 +247,7 @@ export default function TripScreen() {
 
               {/* Submit */}
               <TouchableOpacity onPress={submitReview} activeOpacity={0.88} style={{ marginTop: 18 }}>
-                <LinearGradient colors={[G.darkGreen, G.midGreen]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.submitBtn}>
+                <LinearGradient colors={[G.darkGreen, G.midGreen] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.submitBtn}>
                   <Ionicons name="paper-plane" size={18} color="#fff" />
                   <Text style={styles.submitText}>Submit Review</Text>
                 </LinearGradient>
@@ -270,21 +262,29 @@ export default function TripScreen() {
             {reviews.length === 0 ? (
               <View style={styles.empty}>
                 <Ionicons name="map-outline" size={50} color={G.border} />
-                <Text style={styles.emptyTitle}>No trips yet</Text>
-                <Text style={styles.emptySub}>Record your first trip to see it here</Text>
+                <Text style={[styles.emptyTitle, { color: G.text }]}>No trips yet</Text>
+                <Text style={[styles.emptySub, { color: G.sub }]}>Record your first trip to see it here</Text>
               </View>
             ) : reviews.map((r) => {
               const mid = Math.floor(r.route.length / 2);
               const midPt = r.route[mid] || r.route[0];
               return (
-                <TouchableOpacity key={r.id} onPress={() => openReviewMap(r)} activeOpacity={0.85} style={styles.reviewCard}>
+                <TouchableOpacity key={r.id} onPress={() => openReviewMap(r)} activeOpacity={0.85}
+                  style={[styles.reviewCard, {
+                    backgroundColor: G.card, borderColor: G.border,
+                    ...Platform.select({
+                      ios: { shadowColor: isDark ? '#000' : G.darkGreen, shadowOffset: { width: 0, height: 3 }, shadowOpacity: isDark ? 0.3 : 0.08, shadowRadius: 10 },
+                      android: { elevation: 3 },
+                    }),
+                  }]}
+                >
                   <View style={styles.reviewCardHeader}>
-                    <View style={styles.reviewIconWrap}>
+                    <View style={[styles.reviewIconWrap, { backgroundColor: G.lightGreen }]}>
                       <Ionicons name="navigate-circle" size={20} color={G.midGreen} />
                     </View>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.reviewCardTitle}>Trip #{r.id.slice(-4)}</Text>
-                      <Text style={styles.reviewCardSub}>{r.route.length} waypoints recorded</Text>
+                      <Text style={[styles.reviewCardTitle, { color: G.text }]}>Trip #{r.id.slice(-4)}</Text>
+                      <Text style={[styles.reviewCardSub, { color: G.sub }]}>{r.route.length} waypoints recorded</Text>
                     </View>
                     <Ionicons name="chevron-forward" size={18} color={G.sub} />
                   </View>
@@ -300,9 +300,9 @@ export default function TripScreen() {
                   )}
 
                   {r.text ? (
-                    <View style={styles.reviewText}>
+                    <View style={[styles.reviewText, { backgroundColor: G.lightGreen }]}>
                       <Ionicons name="chatbubble-ellipses-outline" size={14} color={G.midGreen} />
-                      <Text style={styles.reviewTextContent} numberOfLines={2}>{r.text}</Text>
+                      <Text style={[styles.reviewTextContent, { color: G.midGreen }]} numberOfLines={2}>{r.text}</Text>
                     </View>
                   ) : null}
 
@@ -337,7 +337,7 @@ export default function TripScreen() {
             >
               <Polyline coordinates={selectedReview.route} strokeColor={G.darkGreen} strokeWidth={4} />
             </MapView>
-            <TouchableOpacity style={styles.closeMapBtn} onPress={() => setModalVisible(false)}>
+            <TouchableOpacity style={[styles.closeMapBtn, { backgroundColor: G.darkGreen }]} onPress={() => setModalVisible(false)}>
               <Ionicons name="close" size={18} color="#fff" />
               <Text style={styles.closeMapText}>Close Map</Text>
             </TouchableOpacity>
@@ -369,7 +369,7 @@ export default function TripScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: G.bg },
+  root: { flex: 1 },
 
   // Hero
   hero: { paddingHorizontal: 20, paddingBottom: 20, overflow: 'hidden' },
@@ -386,29 +386,32 @@ const styles = StyleSheet.create({
   toggleText: { fontSize: 13, fontWeight: '700', color: 'rgba(255,255,255,0.75)' },
 
   // Map
-  mapWrapper: { margin: 16, borderRadius: 20, overflow: 'hidden', position: 'relative', ...Platform.select({ ios: { shadowColor: G.darkGreen, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12 }, android: { elevation: 5 } }) },
+  mapWrapper: { margin: 16, borderRadius: 20, overflow: 'hidden', position: 'relative' },
   map: { width: '100%', height: 260 },
-  liveTag: { position: 'absolute', top: 12, left: 12, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: G.red, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
+  liveTag: { position: 'absolute', top: 12, left: 12, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
   liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#fff' },
   liveText: { color: '#fff', fontSize: 12, fontWeight: '800', letterSpacing: 1 },
 
   // Buttons
   btnRow: { flexDirection: 'row', gap: 12, paddingHorizontal: 16, marginBottom: 4 },
-  actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 16, ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 10 }, android: { elevation: 5 } }) },
+  actionBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 16,
+    ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 10 }, android: { elevation: 5 } }),
+  },
   actionBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
 
   // Section
   section: { paddingHorizontal: 16, marginTop: 16 },
-  sectionLabel: { fontSize: 15, fontWeight: '700', color: G.text, marginBottom: 12 },
+  sectionLabel: { fontSize: 15, fontWeight: '700', marginBottom: 12 },
 
   // Review Input
-  reviewInput: { backgroundColor: G.card, borderRadius: 16, borderWidth: 1.5, borderColor: G.border, paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, color: G.text, minHeight: 100 },
+  reviewInput: { borderRadius: 16, borderWidth: 1.5, paddingHorizontal: 16, paddingVertical: 14, fontSize: 15, minHeight: 100 },
 
   // Media
   mediaRow: { flexDirection: 'row', gap: 12, marginTop: 12 },
-  mediaBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: G.card, borderRadius: 14, padding: 12, borderWidth: 1, borderColor: G.border, borderStyle: 'dashed' },
+  mediaBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 14, padding: 12, borderWidth: 1, borderStyle: 'dashed' },
   mediaBtnIcon: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
-  mediaBtnLabel: { fontSize: 13, fontWeight: '600', color: G.sub },
+  mediaBtnLabel: { fontSize: 13, fontWeight: '600' },
   thumbWrap: { position: 'relative' },
   thumb: { width: 85, height: 85, borderRadius: 12 },
   videoThumb: { width: 85, height: 85, borderRadius: 12, backgroundColor: '#1A2E4A', justifyContent: 'center', alignItems: 'center', gap: 4 },
@@ -416,28 +419,31 @@ const styles = StyleSheet.create({
   thumbRemove: { position: 'absolute', top: -6, right: -6 },
 
   // Submit
-  submitBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, padding: 18, borderRadius: 18, ...Platform.select({ ios: { shadowColor: G.darkGreen, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 14 }, android: { elevation: 8 } }) },
+  submitBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, padding: 18, borderRadius: 18,
+    ...Platform.select({ ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 14 }, android: { elevation: 8 } }),
+  },
   submitText: { color: '#fff', fontWeight: '800', fontSize: 16 },
 
   // Review Cards
-  reviewCard: { backgroundColor: G.card, borderRadius: 20, padding: 16, marginBottom: 14, borderWidth: 1, borderColor: G.border, ...Platform.select({ ios: { shadowColor: G.darkGreen, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.08, shadowRadius: 10 }, android: { elevation: 3 } }) },
+  reviewCard: { borderRadius: 20, padding: 16, marginBottom: 14, borderWidth: 1 },
   reviewCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },
-  reviewIconWrap: { width: 38, height: 38, borderRadius: 12, backgroundColor: G.lightGreen, justifyContent: 'center', alignItems: 'center' },
-  reviewCardTitle: { fontSize: 15, fontWeight: '700', color: G.text },
-  reviewCardSub: { fontSize: 12, color: G.sub, marginTop: 2 },
+  reviewIconWrap: { width: 38, height: 38, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  reviewCardTitle: { fontSize: 15, fontWeight: '700' },
+  reviewCardSub: { fontSize: 12, marginTop: 2 },
   smallMap: { width: '100%', height: 140, borderRadius: 14, overflow: 'hidden', marginBottom: 10 },
-  reviewText: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, backgroundColor: G.lightGreen, padding: 10, borderRadius: 10 },
-  reviewTextContent: { flex: 1, fontSize: 13, color: G.midGreen, lineHeight: 18 },
+  reviewText: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, padding: 10, borderRadius: 10 },
+  reviewTextContent: { flex: 1, fontSize: 13, lineHeight: 18 },
   reviewThumb: { width: 70, height: 70, borderRadius: 10 },
   reviewVideoThumb: { width: 70, height: 70, borderRadius: 10, backgroundColor: '#1A2E4A', justifyContent: 'center', alignItems: 'center' },
 
   // Empty state
   empty: { alignItems: 'center', paddingVertical: 60, gap: 10 },
-  emptyTitle: { fontSize: 17, fontWeight: '700', color: G.text },
-  emptySub: { fontSize: 13, color: G.sub, textAlign: 'center' },
+  emptyTitle: { fontSize: 17, fontWeight: '700' },
+  emptySub: { fontSize: 13, textAlign: 'center' },
 
   // Modals
-  closeMapBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, position: 'absolute', bottom: 40, alignSelf: 'center', backgroundColor: G.darkGreen, paddingVertical: 12, paddingHorizontal: 28, borderRadius: 24 },
+  closeMapBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, position: 'absolute', bottom: 40, alignSelf: 'center', paddingVertical: 12, paddingHorizontal: 28, borderRadius: 24 },
   closeMapText: { color: '#fff', fontWeight: '700', fontSize: 15 },
   mediaClose: { position: 'absolute', top: 50, right: 20, zIndex: 10, backgroundColor: 'rgba(255,255,255,0.15)', padding: 8, borderRadius: 20 },
 });

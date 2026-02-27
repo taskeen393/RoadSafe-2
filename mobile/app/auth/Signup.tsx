@@ -19,27 +19,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { authService } from '../services';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../../components/ToastContext';
+import { useTheme } from '../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
-
-// ─── Theme ───
-const G = {
-  bg: '#F4F7F4',
-  card: '#FFFFFF',
-  darkGreen: '#1A4D2E',
-  midGreen: '#2D7A4D',
-  lightGreen: '#E8F5ED',
-  text: '#1A1A1A',
-  sub: '#6B7280',
-  border: '#D1E8D9',
-  inputBg: '#F9FBFA',
-};
 
 export default function Signup() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { login: loginContext } = useAuth();
   const { showToast } = useToast();
+  const { colors: G, isDark } = useTheme();
   const scrollRef = useRef<ScrollView>(null);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -48,7 +37,6 @@ export default function Signup() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  // Auto-scroll to focused input so keyboard doesn't cover it
   const scrollToInput = (y: number) => {
     setTimeout(() => {
       scrollRef.current?.scrollTo({ y: y - 100, animated: true });
@@ -88,7 +76,7 @@ export default function Signup() {
   };
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: G.bg }]}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -102,7 +90,7 @@ export default function Signup() {
         >
           {/* ─── Hero Header ─── */}
           <LinearGradient
-            colors={[G.darkGreen, G.midGreen]}
+            colors={G.gradientHero}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={[styles.hero, { paddingTop: insets.top + 30 }]}
@@ -120,7 +108,7 @@ export default function Signup() {
             </TouchableOpacity>
 
             <View style={styles.logoWrap}>
-              <View style={styles.logoCircle}>
+              <View style={[styles.logoCircle, { backgroundColor: isDark ? '#1E1E1E' : '#fff' }]}>
                 <MaterialCommunityIcons name="shield-check" size={32} color={G.midGreen} />
               </View>
             </View>
@@ -129,23 +117,29 @@ export default function Signup() {
           </LinearGradient>
 
           {/* ─── Form Card ─── */}
-          <View style={styles.formCard}>
-            <Text style={styles.formTitle}>Create Account</Text>
-            <Text style={styles.formSubtitle}>Join the road safety community</Text>
+          <View style={[styles.formCard, {
+            backgroundColor: G.card,
+            ...Platform.select({
+              ios: { shadowColor: isDark ? '#000' : '#1A4D2E', shadowOffset: { width: 0, height: 8 }, shadowOpacity: isDark ? 0.3 : 0.1, shadowRadius: 20 },
+              android: { elevation: 8 },
+            }),
+          }]}>
+            <Text style={[styles.formTitle, { color: G.text }]}>Create Account</Text>
+            <Text style={[styles.formSubtitle, { color: G.sub }]}>Join the road safety community</Text>
 
             {/* Name Input */}
             <View style={styles.fieldWrap}>
-              <Text style={styles.fieldLabel}>Full Name</Text>
-              <View style={styles.inputRow}>
-                <View style={styles.inputIconWrap}>
+              <Text style={[styles.fieldLabel, { color: G.text }]}>Full Name</Text>
+              <View style={[styles.inputRow, { backgroundColor: G.inputBg, borderColor: G.border }]}>
+                <View style={[styles.inputIconWrap, { backgroundColor: G.lightGreen }]}>
                   <Ionicons name="person-outline" size={18} color={G.midGreen} />
                 </View>
                 <TextInput
-                  style={styles.textInput}
+                  style={[styles.textInput, { color: G.text }]}
                   value={name}
                   onChangeText={setName}
                   placeholder="Enter your full name"
-                  placeholderTextColor="#B0B7C3"
+                  placeholderTextColor={G.sub}
                   autoCapitalize="words"
                   onFocus={(e) => {
                     (e.target as any)?.measureInWindow?.((x: number, y: number) => scrollToInput(y));
@@ -156,17 +150,17 @@ export default function Signup() {
 
             {/* Email Input */}
             <View style={styles.fieldWrap}>
-              <Text style={styles.fieldLabel}>Email Address</Text>
-              <View style={styles.inputRow}>
-                <View style={styles.inputIconWrap}>
+              <Text style={[styles.fieldLabel, { color: G.text }]}>Email Address</Text>
+              <View style={[styles.inputRow, { backgroundColor: G.inputBg, borderColor: G.border }]}>
+                <View style={[styles.inputIconWrap, { backgroundColor: G.lightGreen }]}>
                   <Ionicons name="mail-outline" size={18} color={G.midGreen} />
                 </View>
                 <TextInput
-                  style={styles.textInput}
+                  style={[styles.textInput, { color: G.text }]}
                   value={email}
                   onChangeText={setEmail}
                   placeholder="Enter your email"
-                  placeholderTextColor="#B0B7C3"
+                  placeholderTextColor={G.sub}
                   keyboardType="email-address"
                   autoCapitalize="none"
                   onFocus={(e) => {
@@ -178,17 +172,17 @@ export default function Signup() {
 
             {/* Password Input */}
             <View style={styles.fieldWrap}>
-              <Text style={styles.fieldLabel}>Password</Text>
-              <View style={styles.inputRow}>
-                <View style={styles.inputIconWrap}>
+              <Text style={[styles.fieldLabel, { color: G.text }]}>Password</Text>
+              <View style={[styles.inputRow, { backgroundColor: G.inputBg, borderColor: G.border }]}>
+                <View style={[styles.inputIconWrap, { backgroundColor: G.lightGreen }]}>
                   <Ionicons name="lock-closed-outline" size={18} color={G.midGreen} />
                 </View>
                 <TextInput
-                  style={styles.textInput}
+                  style={[styles.textInput, { color: G.text }]}
                   value={password}
                   onChangeText={setPassword}
                   placeholder="Min. 6 characters"
-                  placeholderTextColor="#B0B7C3"
+                  placeholderTextColor={G.sub}
                   secureTextEntry={!showPassword}
                   onFocus={(e) => {
                     (e.target as any)?.measureInWindow?.((x: number, y: number) => scrollToInput(y));
@@ -209,16 +203,18 @@ export default function Signup() {
 
             {/* Confirm Password Input */}
             <View style={styles.fieldWrap}>
-              <Text style={styles.fieldLabel}>Confirm Password</Text>
+              <Text style={[styles.fieldLabel, { color: G.text }]}>Confirm Password</Text>
               <View style={[
                 styles.inputRow,
+                { backgroundColor: G.inputBg, borderColor: G.border },
                 confirmPassword.length > 0 && password !== confirmPassword && { borderColor: '#EF4444' },
                 confirmPassword.length > 0 && password === confirmPassword && { borderColor: G.midGreen },
               ]}>
                 <View style={[
                   styles.inputIconWrap,
+                  { backgroundColor: G.lightGreen },
                   confirmPassword.length > 0 && password === confirmPassword && { backgroundColor: G.lightGreen },
-                  confirmPassword.length > 0 && password !== confirmPassword && { backgroundColor: '#FEE2E2' },
+                  confirmPassword.length > 0 && password !== confirmPassword && { backgroundColor: isDark ? '#3A1A1A' : '#FEE2E2' },
                 ]}>
                   <Ionicons
                     name={confirmPassword.length > 0 && password === confirmPassword ? 'checkmark-circle' : 'lock-closed-outline'}
@@ -227,11 +223,11 @@ export default function Signup() {
                   />
                 </View>
                 <TextInput
-                  style={styles.textInput}
+                  style={[styles.textInput, { color: G.text }]}
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
                   placeholder="Re-enter your password"
-                  placeholderTextColor="#B0B7C3"
+                  placeholderTextColor={G.sub}
                   secureTextEntry={!showConfirm}
                   onFocus={(e) => {
                     (e.target as any)?.measureInWindow?.((x: number, y: number) => scrollToInput(y));
@@ -261,7 +257,7 @@ export default function Signup() {
               style={{ marginTop: 4 }}
             >
               <LinearGradient
-                colors={loading ? ['#9CA3AF', '#6B7280'] : [G.darkGreen, G.midGreen]}
+                colors={loading ? ['#9CA3AF', '#6B7280'] as [string, string] : [G.darkGreen, G.midGreen] as [string, string]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.submitBtn}
@@ -279,24 +275,24 @@ export default function Signup() {
 
             {/* Divider */}
             <View style={styles.dividerRow}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>OR</Text>
-              <View style={styles.dividerLine} />
+              <View style={[styles.dividerLine, { backgroundColor: G.divider }]} />
+              <Text style={[styles.dividerText, { color: G.sub }]}>OR</Text>
+              <View style={[styles.dividerLine, { backgroundColor: G.divider }]} />
             </View>
 
             {/* Login Link */}
             <TouchableOpacity
               onPress={() => router.push('./login')}
-              style={styles.altBtn}
+              style={[styles.altBtn, { backgroundColor: G.lightGreen, borderColor: G.border }]}
               activeOpacity={0.8}
             >
               <Ionicons name="log-in-outline" size={18} color={G.midGreen} />
-              <Text style={styles.altBtnText}>Already have an account? Login</Text>
+              <Text style={[styles.altBtnText, { color: G.midGreen }]}>Already have an account? Login</Text>
             </TouchableOpacity>
           </View>
 
           {/* Footer */}
-          <Text style={styles.footer}>
+          <Text style={[styles.footer, { color: G.sub }]}>
             By signing up, you agree to our Terms & Privacy Policy
           </Text>
         </ScrollView>
@@ -306,138 +302,62 @@ export default function Signup() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: G.bg },
+  root: { flex: 1 },
   scrollContent: { flexGrow: 1, paddingBottom: 40 },
 
   // Hero
-  hero: {
-    alignItems: 'center',
-    paddingBottom: 45,
-    overflow: 'hidden',
-  },
-  heroDeco1: {
-    position: 'absolute', top: -50, right: -40,
-    width: 180, height: 180, borderRadius: 90,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-  },
-  heroDeco2: {
-    position: 'absolute', bottom: -30, left: -30,
-    width: 140, height: 140, borderRadius: 70,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-  },
-  heroDeco3: {
-    position: 'absolute', top: 40, left: 50,
-    width: 50, height: 50, borderRadius: 25,
-    backgroundColor: 'rgba(255,255,255,0.03)',
-  },
+  hero: { alignItems: 'center', paddingBottom: 45, overflow: 'hidden' },
+  heroDeco1: { position: 'absolute', top: -50, right: -40, width: 180, height: 180, borderRadius: 90, backgroundColor: 'rgba(255,255,255,0.06)' },
+  heroDeco2: { position: 'absolute', bottom: -30, left: -30, width: 140, height: 140, borderRadius: 70, backgroundColor: 'rgba(255,255,255,0.04)' },
+  heroDeco3: { position: 'absolute', top: 40, left: 50, width: 50, height: 50, borderRadius: 25, backgroundColor: 'rgba(255,255,255,0.03)' },
   backBtn: {
-    position: 'absolute', left: 16, zIndex: 10,
-    width: 38, height: 38, borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    justifyContent: 'center', alignItems: 'center',
+    position: 'absolute', left: 16, zIndex: 10, width: 38, height: 38, borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center',
   },
   logoWrap: { marginBottom: 14 },
   logoCircle: {
-    width: 68, height: 68, borderRadius: 24,
-    backgroundColor: '#fff',
-    justifyContent: 'center', alignItems: 'center',
+    width: 68, height: 68, borderRadius: 24, justifyContent: 'center', alignItems: 'center',
     ...Platform.select({
       ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.15, shadowRadius: 16 },
       android: { elevation: 10 },
     }),
   },
-  heroTitle: {
-    fontSize: 26, fontWeight: '800', color: '#fff',
-    letterSpacing: -0.5,
-  },
-  heroTagline: {
-    fontSize: 13, color: 'rgba(255,255,255,0.7)',
-    marginTop: 6,
-  },
+  heroTitle: { fontSize: 26, fontWeight: '800', color: '#fff', letterSpacing: -0.5 },
+  heroTagline: { fontSize: 13, color: 'rgba(255,255,255,0.7)', marginTop: 6 },
 
   // Form Card
-  formCard: {
-    backgroundColor: G.card,
-    marginHorizontal: 20,
-    marginTop: -26,
-    borderRadius: 24,
-    padding: 22,
-    ...Platform.select({
-      ios: { shadowColor: '#1A4D2E', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.1, shadowRadius: 20 },
-      android: { elevation: 8 },
-    }),
-  },
-  formTitle: {
-    fontSize: 22, fontWeight: '800', color: G.text,
-    letterSpacing: -0.3,
-  },
-  formSubtitle: {
-    fontSize: 13, color: G.sub, marginTop: 4, marginBottom: 24,
-  },
+  formCard: { marginHorizontal: 20, marginTop: -26, borderRadius: 24, padding: 22 },
+  formTitle: { fontSize: 22, fontWeight: '800', letterSpacing: -0.3 },
+  formSubtitle: { fontSize: 13, marginTop: 4, marginBottom: 24 },
 
   // Fields
   fieldWrap: { marginBottom: 16 },
-  fieldLabel: {
-    fontSize: 13, fontWeight: '700', color: G.text,
-    marginBottom: 8, letterSpacing: -0.1,
-  },
-  inputRow: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: G.inputBg,
-    borderWidth: 1.5, borderColor: G.border,
-    borderRadius: 16, paddingHorizontal: 4,
-  },
-  inputIconWrap: {
-    width: 38, height: 38, borderRadius: 12,
-    backgroundColor: G.lightGreen,
-    justifyContent: 'center', alignItems: 'center',
-    marginLeft: 4,
-  },
-  textInput: {
-    flex: 1, fontSize: 15, color: G.text,
-    paddingVertical: 13, paddingHorizontal: 12,
-  },
+  fieldLabel: { fontSize: 13, fontWeight: '700', marginBottom: 8, letterSpacing: -0.1 },
+  inputRow: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderRadius: 16, paddingHorizontal: 4 },
+  inputIconWrap: { width: 38, height: 38, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginLeft: 4 },
+  textInput: { flex: 1, fontSize: 15, paddingVertical: 13, paddingHorizontal: 12 },
   eyeBtn: { padding: 10 },
-  errorHint: {
-    fontSize: 11, color: '#EF4444', fontWeight: '600',
-    marginTop: 6, marginLeft: 4,
-  },
+  errorHint: { fontSize: 11, color: '#EF4444', fontWeight: '600', marginTop: 6, marginLeft: 4 },
 
   // Submit
   submitBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 10, borderRadius: 16, paddingVertical: 16,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10, borderRadius: 16, paddingVertical: 16,
     ...Platform.select({
-      ios: { shadowColor: G.darkGreen, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 14 },
+      ios: { shadowColor: '#1A4D2E', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 14 },
       android: { elevation: 8 },
     }),
   },
-  submitText: {
-    fontSize: 16, fontWeight: '800', color: '#fff', letterSpacing: 0.3,
-  },
+  submitText: { fontSize: 16, fontWeight: '800', color: '#fff', letterSpacing: 0.3 },
 
   // Divider
-  dividerRow: {
-    flexDirection: 'row', alignItems: 'center',
-    marginVertical: 18, gap: 12,
-  },
-  dividerLine: { flex: 1, height: 1, backgroundColor: '#E5E7EB' },
-  dividerText: { fontSize: 12, fontWeight: '600', color: G.sub },
+  dividerRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 18, gap: 12 },
+  dividerLine: { flex: 1, height: 1 },
+  dividerText: { fontSize: 12, fontWeight: '600' },
 
   // Alt Button
-  altBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 8, paddingVertical: 14, borderRadius: 16,
-    backgroundColor: G.lightGreen, borderWidth: 1.5, borderColor: G.border,
-  },
-  altBtnText: {
-    fontSize: 14, fontWeight: '700', color: G.midGreen,
-  },
+  altBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 16, borderWidth: 1.5 },
+  altBtnText: { fontSize: 14, fontWeight: '700' },
 
   // Footer
-  footer: {
-    textAlign: 'center', fontSize: 11, color: G.sub,
-    marginTop: 20, marginBottom: 30, paddingHorizontal: 40,
-    lineHeight: 16,
-  },
+  footer: { textAlign: 'center', fontSize: 11, marginTop: 20, marginBottom: 30, paddingHorizontal: 40, lineHeight: 16 },
 });

@@ -22,24 +22,12 @@ import { reportService } from '../services';
 import { ReportRequest } from '../services/types';
 import { useToast } from '../../components/ToastContext';
 import ActionSheet from '../../components/ActionSheet';
-
-// ─── Theme tokens ───
-const G = {
-  bg: '#F4F7F4',
-  card: '#FFFFFF',
-  darkGreen: '#1A4D2E',
-  midGreen: '#2D7A4D',
-  lightGreen: '#E8F5ED',
-  accent: '#E95B5B',
-  text: '#1A1A1A',
-  sub: '#6B7280',
-  border: '#D1E8D9',
-  inputBg: '#F9FBFA',
-};
+import { useTheme } from '../context/ThemeContext';
 
 
 export default function ReportScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
+  const { colors: G, isDark } = useTheme();
   const [user, setUser] = useState('');
   const [location, setLocation] = useState('');
   const [lat, setLat] = useState<number | null>(null);
@@ -96,9 +84,7 @@ export default function ReportScreen({ navigation }: any) {
     }
   };
 
-  const pickImages = async () => {
-    setImageSheetVisible(true);
-  };
+  const pickImages = async () => { setImageSheetVisible(true); };
 
   const handleImageFromCamera = async () => {
     const r = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.6 });
@@ -110,9 +96,7 @@ export default function ReportScreen({ navigation }: any) {
     if (!r.canceled) setSelectedImages(p => [...p, ...r.assets.map(a => a.uri)]);
   };
 
-  const pickVideos = async () => {
-    setVideoSheetVisible(true);
-  };
+  const pickVideos = async () => { setVideoSheetVisible(true); };
 
   const handleVideoFromCamera = async () => {
     const r = await ImagePicker.launchCameraAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Videos });
@@ -156,18 +140,16 @@ export default function ReportScreen({ navigation }: any) {
   };
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]}>
+    <View style={[styles.screen, { backgroundColor: G.bg, paddingTop: insets.top }]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{ paddingBottom: 120 }}>
 
         {/* ─── Hero Header ─── */}
-        <LinearGradient colors={[G.darkGreen, G.midGreen]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.hero, { paddingTop: insets.top + 16 }]}>
-          {/* Decorative circles */}
+        <LinearGradient colors={G.gradientHero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.hero, { paddingTop: insets.top + 16 }]}>
           <View style={styles.heroDeco1} />
           <View style={styles.heroDeco2} />
-
           <View style={styles.heroContent}>
             <View style={styles.heroIconWrap}>
               <Ionicons name="warning" size={26} color="#fff" />
@@ -189,16 +171,16 @@ export default function ReportScreen({ navigation }: any) {
 
         {/* ─── Incident Type Pills ─── */}
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Incident Type</Text>
+          <Text style={[styles.sectionLabel, { color: G.text }]}>Incident Type</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
             {incidentTypes.map((t) => (
               <TouchableOpacity
                 key={t.label}
-                style={[styles.typePill, selectedType === t.label && { backgroundColor: t.color, borderColor: t.color }]}
+                style={[styles.typePill, { backgroundColor: G.card, borderColor: G.border }, selectedType === t.label && { backgroundColor: t.color, borderColor: t.color }]}
                 onPress={() => setSelectedType(selectedType === t.label ? '' : t.label)}
               >
                 <Ionicons name={t.icon as any} size={14} color={selectedType === t.label ? '#fff' : G.sub} />
-                <Text style={[styles.typePillText, selectedType === t.label && { color: '#fff' }]}>{t.label}</Text>
+                <Text style={[styles.typePillText, { color: G.sub }, selectedType === t.label && { color: '#fff' }]}>{t.label}</Text>
               </TouchableOpacity>
             ))}
           </ScrollView>
@@ -206,16 +188,16 @@ export default function ReportScreen({ navigation }: any) {
 
         {/* ─── Description ─── */}
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Incident Details</Text>
+          <Text style={[styles.sectionLabel, { color: G.text }]}>Incident Details</Text>
           <TextInput
-            style={[styles.descInput, { minHeight: 50, marginBottom: 12 }]}
+            style={[styles.descInput, { minHeight: 50, marginBottom: 12, backgroundColor: G.card, borderColor: G.border, color: G.text }]}
             placeholder="Title (e.g. Heavy Traffic at Main St)"
             placeholderTextColor={G.sub}
             value={titleInput}
             onChangeText={setTitleInput}
           />
           <TextInput
-            style={styles.descInput}
+            style={[styles.descInput, { backgroundColor: G.card, borderColor: G.border, color: G.text }]}
             placeholder="Describe what happened..."
             placeholderTextColor={G.sub}
             value={textInput}
@@ -228,28 +210,26 @@ export default function ReportScreen({ navigation }: any) {
 
         {/* ─── Media Upload ─── */}
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Attach Media</Text>
+          <Text style={[styles.sectionLabel, { color: G.text }]}>Attach Media</Text>
 
           <View style={styles.mediaRow}>
-            {/* Images */}
-            <TouchableOpacity style={styles.mediaBtn} onPress={pickImages} activeOpacity={0.8}>
-              <View style={[styles.mediaBtnIcon, { backgroundColor: '#E8F5ED' }]}>
+            <TouchableOpacity style={[styles.mediaBtn, { backgroundColor: G.card, borderColor: G.border }]} onPress={pickImages} activeOpacity={0.8}>
+              <View style={[styles.mediaBtnIcon, { backgroundColor: G.lightGreen }]}>
                 <Ionicons name="images" size={22} color={G.midGreen} />
               </View>
-              <Text style={styles.mediaBtnLabel}>Photos</Text>
+              <Text style={[styles.mediaBtnLabel, { color: G.sub }]}>Photos</Text>
               {selectedImages.length > 0 && (
-                <View style={styles.mediaBadge}>
+                <View style={[styles.mediaBadge, { backgroundColor: G.midGreen }]}>
                   <Text style={styles.mediaBadgeText}>{selectedImages.length}</Text>
                 </View>
               )}
             </TouchableOpacity>
 
-            {/* Videos */}
-            <TouchableOpacity style={styles.mediaBtn} onPress={pickVideos} activeOpacity={0.8}>
-              <View style={[styles.mediaBtnIcon, { backgroundColor: '#FEF3C7' }]}>
+            <TouchableOpacity style={[styles.mediaBtn, { backgroundColor: G.card, borderColor: G.border }]} onPress={pickVideos} activeOpacity={0.8}>
+              <View style={[styles.mediaBtnIcon, { backgroundColor: isDark ? '#3A2E1A' : '#FEF3C7' }]}>
                 <AntDesign name="video-camera" size={22} color="#D97706" />
               </View>
-              <Text style={styles.mediaBtnLabel}>Videos</Text>
+              <Text style={[styles.mediaBtnLabel, { color: G.sub }]}>Videos</Text>
               {selectedVideos.length > 0 && (
                 <View style={[styles.mediaBadge, { backgroundColor: '#D97706' }]}>
                   <Text style={styles.mediaBadgeText}>{selectedVideos.length}</Text>
@@ -258,7 +238,6 @@ export default function ReportScreen({ navigation }: any) {
             </TouchableOpacity>
           </View>
 
-          {/* Image Thumbnails */}
           {selectedImages.length > 0 && (
             <FlatList
               data={selectedImages}
@@ -270,7 +249,7 @@ export default function ReportScreen({ navigation }: any) {
                 <View style={styles.thumbWrap}>
                   <Image source={{ uri: item }} style={styles.thumb} />
                   <TouchableOpacity
-                    style={styles.thumbRemove}
+                    style={[styles.thumbRemove, { backgroundColor: G.red }]}
                     onPress={() => setSelectedImages(p => p.filter((_, i) => i !== index))}
                   >
                     <Ionicons name="close-circle" size={20} color="#fff" />
@@ -281,9 +260,9 @@ export default function ReportScreen({ navigation }: any) {
           )}
 
           {selectedVideos.length > 0 && (
-            <View style={styles.videoRow}>
+            <View style={[styles.videoRow, { backgroundColor: G.lightGreen }]}>
               <Ionicons name="checkmark-circle" size={16} color={G.midGreen} />
-              <Text style={styles.videoText}>{selectedVideos.length} video{selectedVideos.length > 1 ? 's' : ''} selected</Text>
+              <Text style={[styles.videoText, { color: G.midGreen }]}>{selectedVideos.length} video{selectedVideos.length > 1 ? 's' : ''} selected</Text>
             </View>
           )}
         </View>
@@ -292,7 +271,7 @@ export default function ReportScreen({ navigation }: any) {
         <View style={{ paddingHorizontal: 20, marginTop: 8 }}>
           <TouchableOpacity onPress={submitReport} disabled={isSubmitting} activeOpacity={0.88}>
             <LinearGradient
-              colors={isSubmitting ? ['#9CA3AF', '#6B7280'] : [G.darkGreen, G.midGreen]}
+              colors={isSubmitting ? ['#9CA3AF', '#6B7280'] : [G.darkGreen, G.midGreen] as [string, string]}
               start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
               style={styles.submitBtn}
             >
@@ -323,7 +302,7 @@ export default function ReportScreen({ navigation }: any) {
           >
             {mapCoords && <Marker coordinate={{ latitude: mapCoords.lat, longitude: mapCoords.lon }} title="Reported Location" />}
           </MapView>
-          <TouchableOpacity style={styles.closeMapBtn} onPress={() => setMapVisible(false)}>
+          <TouchableOpacity style={[styles.closeMapBtn, { backgroundColor: G.darkGreen }]} onPress={() => setMapVisible(false)}>
             <Text style={styles.closeMapText}>✖  Close Map</Text>
           </TouchableOpacity>
         </View>
@@ -334,7 +313,7 @@ export default function ReportScreen({ navigation }: any) {
         visible={imageSheetVisible}
         title="Upload Image"
         options={[
-          { label: 'Take Photo', icon: 'camera', iconColor: '#2D7A4D', onPress: handleImageFromCamera },
+          { label: 'Take Photo', icon: 'camera', iconColor: G.midGreen, onPress: handleImageFromCamera },
           { label: 'Choose from Gallery', icon: 'images', iconColor: '#3B9EE8', onPress: handleImageFromGallery },
         ]}
         onCancel={() => setImageSheetVisible(false)}
@@ -355,178 +334,70 @@ export default function ReportScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: G.bg,
-  },
+  screen: { flex: 1 },
 
-  // ─── Hero ───
-  hero: {
-    paddingHorizontal: 20,
-    paddingVertical: 24,
-    overflow: 'hidden',
-  },
-  heroDeco1: {
-    position: 'absolute', top: -30, right: -30,
-    width: 120, height: 120, borderRadius: 60,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-  },
-  heroDeco2: {
-    position: 'absolute', bottom: -40, right: 60,
-    width: 160, height: 160, borderRadius: 80,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-  },
-  heroContent: {
-    flexDirection: 'row', alignItems: 'center', gap: 14,
-  },
-  heroIconWrap: {
-    width: 50, height: 50, borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    justifyContent: 'center', alignItems: 'center',
-  },
-  heroTitle: {
-    fontSize: 20, fontWeight: '800', color: '#fff', letterSpacing: -0.3,
-  },
-  locationRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4,
-  },
-  locationText: {
-    fontSize: 12, color: 'rgba(255,255,255,0.7)', flex: 1,
-  },
-  locRefreshBtn: {
-    width: 34, height: 34, borderRadius: 17,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    justifyContent: 'center', alignItems: 'center',
-  },
+  // Hero
+  hero: { paddingHorizontal: 20, paddingVertical: 24, overflow: 'hidden' },
+  heroDeco1: { position: 'absolute', top: -30, right: -30, width: 120, height: 120, borderRadius: 60, backgroundColor: 'rgba(255,255,255,0.08)' },
+  heroDeco2: { position: 'absolute', bottom: -40, right: 60, width: 160, height: 160, borderRadius: 80, backgroundColor: 'rgba(255,255,255,0.05)' },
+  heroContent: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  heroIconWrap: { width: 50, height: 50, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
+  heroTitle: { fontSize: 20, fontWeight: '800', color: '#fff', letterSpacing: -0.3 },
+  locationRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+  locationText: { fontSize: 12, color: 'rgba(255,255,255,0.7)', flex: 1 },
+  locRefreshBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' },
 
-  // ─── Sections ───
-  section: {
-    paddingHorizontal: 20,
-    marginTop: 22,
-  },
-  sectionLabel: {
-    fontSize: 14, fontWeight: '700', color: G.text,
-    marginBottom: 12, letterSpacing: -0.1,
-  },
+  // Sections
+  section: { paddingHorizontal: 20, marginTop: 22 },
+  sectionLabel: { fontSize: 14, fontWeight: '700', marginBottom: 12, letterSpacing: -0.1 },
 
-  // ─── Type Pills ───
-  typePill: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    paddingHorizontal: 14, paddingVertical: 9,
-    borderRadius: 20, borderWidth: 1.5,
-    backgroundColor: G.card, borderColor: G.border,
-  },
-  typePillText: {
-    fontSize: 13, fontWeight: '600', color: G.sub,
-  },
+  // Type Pills
+  typePill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 20, borderWidth: 1.5 },
+  typePillText: { fontSize: 13, fontWeight: '600' },
 
-  // ─── Floating Input ───
-  inputWrapper: {
-    backgroundColor: G.inputBg,
-    borderRadius: 16, borderWidth: 1.5,
-    borderColor: G.border,
-    paddingHorizontal: 16, paddingTop: 24, paddingBottom: 12,
-  },
-  inputWrapperFocused: {
-    borderColor: G.midGreen,
-    backgroundColor: '#fff',
-    ...Platform.select({
-      ios: { shadowColor: G.midGreen, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 10 },
-      android: { elevation: 3 },
-    }),
-  },
-  floatLabel: {
-    position: 'absolute', left: 16, fontWeight: '500',
-  },
-  floatInput: {
-    fontSize: 15, color: G.text, paddingVertical: 0, marginTop: 4,
-  },
-
-  // ─── Media ───
-  mediaRow: {
-    flexDirection: 'row', gap: 14,
-  },
+  // Media
+  mediaRow: { flexDirection: 'row', gap: 14 },
   mediaBtn: {
     flex: 1, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: G.card, borderRadius: 18,
-    paddingVertical: 20, borderWidth: 1, borderColor: G.border,
-    borderStyle: 'dashed',
+    borderRadius: 18, paddingVertical: 20, borderWidth: 1, borderStyle: 'dashed',
     ...Platform.select({
       ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8 },
       android: { elevation: 2 },
     }),
   },
-  mediaBtnIcon: {
-    width: 48, height: 48, borderRadius: 14,
-    justifyContent: 'center', alignItems: 'center', marginBottom: 8,
-  },
-  mediaBtnLabel: {
-    fontSize: 13, fontWeight: '600', color: G.sub,
-  },
-  mediaBadge: {
-    position: 'absolute', top: 8, right: 12,
-    backgroundColor: G.midGreen, borderRadius: 10,
-    minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center',
-    paddingHorizontal: 5,
-  },
-  mediaBadgeText: {
-    fontSize: 11, fontWeight: '700', color: '#fff',
-  },
+  mediaBtnIcon: { width: 48, height: 48, borderRadius: 14, justifyContent: 'center', alignItems: 'center', marginBottom: 8 },
+  mediaBtnLabel: { fontSize: 13, fontWeight: '600' },
+  mediaBadge: { position: 'absolute', top: 8, right: 12, borderRadius: 10, minWidth: 20, height: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
+  mediaBadgeText: { fontSize: 11, fontWeight: '700', color: '#fff' },
 
   // Thumbs
   thumbWrap: { position: 'relative' },
-  thumb: {
-    width: 90, height: 90, borderRadius: 14,
-  },
-  thumbRemove: {
-    position: 'absolute', top: -6, right: -6,
-    backgroundColor: G.accent, borderRadius: 12,
-  },
-  videoRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12,
-    backgroundColor: G.lightGreen, padding: 10, borderRadius: 12,
-  },
-  videoText: {
-    fontSize: 13, fontWeight: '600', color: G.midGreen,
-  },
+  thumb: { width: 90, height: 90, borderRadius: 14 },
+  thumbRemove: { position: 'absolute', top: -6, right: -6, borderRadius: 12 },
+  videoRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12, padding: 10, borderRadius: 12 },
+  videoText: { fontSize: 13, fontWeight: '600' },
 
-  // ─── Submit ───
+  // Submit
   submitBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 10, borderRadius: 18, paddingVertical: 18,
     ...Platform.select({
-      ios: { shadowColor: G.darkGreen, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 14 },
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 14 },
       android: { elevation: 8 },
     }),
   },
-  submitText: {
-    fontSize: 16, fontWeight: '800', color: '#fff', letterSpacing: 0.2,
-  },
+  submitText: { fontSize: 16, fontWeight: '800', color: '#fff', letterSpacing: 0.2 },
 
-  // ─── Map modal ───
-  closeMapBtn: {
-    position: 'absolute', bottom: 40, alignSelf: 'center',
-    backgroundColor: G.darkGreen, paddingVertical: 12,
-    paddingHorizontal: 28, borderRadius: 24,
-  },
-  closeMapText: {
-    color: '#fff', fontWeight: '700', fontSize: 15,
-  },
+  // Map modal
+  closeMapBtn: { position: 'absolute', bottom: 40, alignSelf: 'center', paddingVertical: 12, paddingHorizontal: 28, borderRadius: 24 },
+  closeMapText: { color: '#fff', fontWeight: '700', fontSize: 15 },
 
   // Description input
   descInput: {
-    backgroundColor: G.card,
-    borderWidth: 1.5,
-    borderColor: G.border,
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 15,
-    color: G.text,
-    minHeight: 120,
-    textAlignVertical: 'top',
+    borderWidth: 1.5, borderRadius: 16, paddingHorizontal: 16, paddingVertical: 14,
+    fontSize: 15, minHeight: 120, textAlignVertical: 'top',
     ...Platform.select({
-      ios: { shadowColor: G.midGreen, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8 },
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8 },
       android: { elevation: 2 },
     }),
   },

@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTheme } from '../app/context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
@@ -35,41 +36,25 @@ const ToastContext = createContext<ToastContextValue>({
 
 export const useToast = () => useContext(ToastContext);
 
-// ─── Theme Config ───
-const TOAST_THEMES: Record<ToastType, { bg: string; border: string; icon: string; iconName: string; progressColor: string }> = {
-    success: {
-        bg: '#ECFDF5',
-        border: '#A7F3D0',
-        icon: '#059669',
-        iconName: 'checkmark-circle',
-        progressColor: '#059669',
-    },
-    error: {
-        bg: '#FEF2F2',
-        border: '#FECACA',
-        icon: '#DC2626',
-        iconName: 'close-circle',
-        progressColor: '#DC2626',
-    },
-    warning: {
-        bg: '#FFFBEB',
-        border: '#FDE68A',
-        icon: '#D97706',
-        iconName: 'warning',
-        progressColor: '#D97706',
-    },
-    info: {
-        bg: '#EFF6FF',
-        border: '#BFDBFE',
-        icon: '#2563EB',
-        iconName: 'information-circle',
-        progressColor: '#2563EB',
-    },
+// ─── Toast Type Configs (light / dark) ───
+const TOAST_THEMES_LIGHT: Record<ToastType, { bg: string; border: string; icon: string; iconName: string; progressColor: string }> = {
+    success: { bg: '#ECFDF5', border: '#A7F3D0', icon: '#059669', iconName: 'checkmark-circle', progressColor: '#059669' },
+    error: { bg: '#FEF2F2', border: '#FECACA', icon: '#DC2626', iconName: 'close-circle', progressColor: '#DC2626' },
+    warning: { bg: '#FFFBEB', border: '#FDE68A', icon: '#D97706', iconName: 'warning', progressColor: '#D97706' },
+    info: { bg: '#EFF6FF', border: '#BFDBFE', icon: '#2563EB', iconName: 'information-circle', progressColor: '#2563EB' },
+};
+
+const TOAST_THEMES_DARK: Record<ToastType, { bg: string; border: string; icon: string; iconName: string; progressColor: string }> = {
+    success: { bg: '#0D2818', border: '#1A4D2E', icon: '#4ADE80', iconName: 'checkmark-circle', progressColor: '#4ADE80' },
+    error: { bg: '#2A1215', border: '#5A2A2A', icon: '#F87171', iconName: 'close-circle', progressColor: '#F87171' },
+    warning: { bg: '#2A2008', border: '#5A4A1A', icon: '#FBBF24', iconName: 'warning', progressColor: '#FBBF24' },
+    info: { bg: '#0D1B2E', border: '#1A3A5E', icon: '#60A5FA', iconName: 'information-circle', progressColor: '#60A5FA' },
 };
 
 // ─── Provider ───
 export function ToastProvider({ children }: { children: React.ReactNode }) {
     const insets = useSafeAreaInsets();
+    const { isDark } = useTheme();
     const [toast, setToast] = useState<ToastConfig | null>(null);
     const [visible, setVisible] = useState(false);
     const slideAnim = useRef(new Animated.Value(-150)).current;
@@ -89,7 +74,6 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     }, [slideAnim, opacityAnim]);
 
     const showToast = useCallback((config: ToastConfig) => {
-        // Clear any existing timeout
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
 
         const duration = config.duration || 3000;
@@ -100,29 +84,23 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         opacityAnim.setValue(0);
         progressAnim.setValue(1);
 
-        // Slide in
         Animated.parallel([
             Animated.spring(slideAnim, { toValue: 0, tension: 80, friction: 12, useNativeDriver: true }),
             Animated.timing(opacityAnim, { toValue: 1, duration: 250, useNativeDriver: true }),
         ]).start();
 
-        // Progress bar (non-native driver for width)
         Animated.timing(progressAnim, { toValue: 0, duration, useNativeDriver: false }).start();
 
-        // Auto-dismiss
-        timeoutRef.current = setTimeout(() => {
-            hideToast();
-        }, duration);
+        timeoutRef.current = setTimeout(() => { hideToast(); }, duration);
     }, [slideAnim, opacityAnim, progressAnim, hideToast]);
 
-    const theme = toast ? TOAST_THEMES[toast.type] : TOAST_THEMES.info;
+    const themes = isDark ? TOAST_THEMES_DARK : TOAST_THEMES_LIGHT;
+    const theme = toast ? themes[toast.type] : themes.info;
 
     return (
         <ToastContext.Provider value={{ showToast }}>
             {children}
 
-            {/* Render toast in a transparent Modal so it floats above
-                react-native-screens native containers */}
             <Modal
                 visible={visible}
                 transparent
@@ -154,13 +132,13 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                                 <View style={styles.textWrap}>
                                     <Text style={[styles.title, { color: theme.icon }]}>{toast.title}</Text>
                                     {toast.message ? (
-                                        <Text style={styles.message} numberOfLines={2}>{toast.message}</Text>
+                                        <Text style={[styles.message, { color: isDark ? '#9CA3AF' : '#6B7280' }]} numberOfLines={2}>{toast.message}</Text>
                                     ) : null}
                                 </View>
 
                                 {/* Close Button */}
-                                <TouchableOpacity onPress={hideToast} style={styles.closeBtn} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                                    <Ionicons name="close" size={18} color="#9CA3AF" />
+                                <TouchableOpacity onPress={hideToast} style={[styles.closeBtn, { backgroundColor: isDark ? '#2A2A2A' : '#F3F4F6' }]} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                                    <Ionicons name="close" size={18} color={isDark ? '#9CA3AF' : '#9CA3AF'} />
                                 </TouchableOpacity>
 
                                 {/* Progress Bar */}
@@ -186,71 +164,20 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 }
 
 const styles = StyleSheet.create({
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'transparent',
-    },
-    toastContainer: {
-        position: 'absolute',
-        left: 16,
-        right: 16,
-        zIndex: 9999,
-        elevation: 9999,
-    },
+    modalOverlay: { flex: 1, backgroundColor: 'transparent' },
+    toastContainer: { position: 'absolute', left: 16, right: 16, zIndex: 9999, elevation: 9999 },
     toast: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        borderRadius: 16,
-        paddingVertical: 14,
-        paddingHorizontal: 14,
-        borderWidth: 1.5,
-        overflow: 'hidden',
+        flexDirection: 'row', alignItems: 'center', borderRadius: 16,
+        paddingVertical: 14, paddingHorizontal: 14, borderWidth: 1.5, overflow: 'hidden',
         ...Platform.select({
-            ios: {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 8 },
-                shadowOpacity: 0.15,
-                shadowRadius: 20,
-            },
+            ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 20 },
             android: { elevation: 12 },
         }),
     },
-    iconWrap: {
-        width: 40,
-        height: 40,
-        borderRadius: 12,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 12,
-    },
-    textWrap: {
-        flex: 1,
-    },
-    title: {
-        fontSize: 15,
-        fontWeight: '700',
-        letterSpacing: -0.2,
-    },
-    message: {
-        fontSize: 13,
-        color: '#6B7280',
-        marginTop: 2,
-        lineHeight: 18,
-    },
-    closeBtn: {
-        marginLeft: 8,
-        width: 28,
-        height: 28,
-        borderRadius: 14,
-        backgroundColor: '#F3F4F6',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    progressBar: {
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        height: 3,
-        borderBottomLeftRadius: 16,
-    },
+    iconWrap: { width: 40, height: 40, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
+    textWrap: { flex: 1 },
+    title: { fontSize: 15, fontWeight: '700', letterSpacing: -0.2 },
+    message: { fontSize: 13, marginTop: 2, lineHeight: 18 },
+    closeBtn: { marginLeft: 8, width: 28, height: 28, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+    progressBar: { position: 'absolute', bottom: 0, left: 0, height: 3, borderBottomLeftRadius: 16 },
 });

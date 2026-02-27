@@ -16,7 +16,8 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { COLORS, RADIUS, SPACING } from '../constants/globalStyles';
+import { RADIUS, SPACING } from '../constants/globalStyles';
+import { useTheme } from '../app/context/ThemeContext';
 import { chatbotService } from '../app/services';
 
 type Message = {
@@ -35,6 +36,7 @@ const WELCOME_MESSAGE: Message = {
 };
 
 export default function ChatbotFAB() {
+    const { colors: G, isDark } = useTheme();
     const [visible, setVisible] = useState(false);
     const [message, setMessage] = useState('');
     const [chat, setChat] = useState<Message[]>([WELCOME_MESSAGE]);
@@ -60,7 +62,6 @@ export default function ChatbotFAB() {
     const handleSend = useCallback(async () => {
         if (!message.trim() || loading || isSendDisabled) return;
 
-        // Debounce protection
         setIsSendDisabled(true);
         if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
 
@@ -94,7 +95,6 @@ export default function ChatbotFAB() {
             ]);
         } finally {
             setLoading(false);
-            // Re-enable send after debounce delay
             debounceTimerRef.current = setTimeout(() => {
                 setIsSendDisabled(false);
             }, DEBOUNCE_MS);
@@ -103,14 +103,12 @@ export default function ChatbotFAB() {
 
     // Retry failed message
     const handleRetry = useCallback(async (errorMsgId: number) => {
-        // Find the user message just before the error
         const errorIndex = chat.findIndex(m => m.id === errorMsgId);
         if (errorIndex <= 0) return;
 
         const userMsg = chat[errorIndex - 1];
         if (userMsg.sender !== 'user') return;
 
-        // Remove the error message
         setChat(prev => prev.filter(m => m.id !== errorMsgId));
         setLoading(true);
 
@@ -160,44 +158,43 @@ export default function ChatbotFAB() {
         <>
             {/* ─── FAB Button ─── */}
             <Animated.View style={[styles.fabContainer, { transform: [{ scale: scaleAnim }] }]}>
-                {/* Soft glow ring */}
-                <View style={styles.fabGlow} />
+                <View style={[styles.fabGlow, { backgroundColor: G.midGreen }]} />
                 <TouchableOpacity
-                    style={styles.fab}
+                    style={[styles.fab, { backgroundColor: G.midGreen, shadowColor: G.midGreen }]}
                     onPress={() => setVisible(true)}
                     activeOpacity={0.8}
                 >
-                    <MaterialCommunityIcons name="robot-happy" size={24} color={COLORS.textWhite} />
+                    <MaterialCommunityIcons name="robot-happy" size={24} color="#fff" />
                 </TouchableOpacity>
             </Animated.View>
 
             {/* ─── Chatbot Modal ─── */}
             <Modal visible={visible} animationType="slide" transparent onRequestClose={() => setVisible(false)}>
-                <View style={styles.modalOverlay}>
+                <View style={[styles.modalOverlay, { backgroundColor: G.overlay }]}>
                     <KeyboardAvoidingView
                         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                        style={styles.modalContainer}
+                        style={[styles.modalContainer, { backgroundColor: G.card }]}
                     >
                         {/* Header */}
-                        <View style={styles.modalHeader}>
+                        <View style={[styles.modalHeader, { borderBottomColor: G.border }]}>
                             <View style={styles.headerLeft}>
-                                <View style={styles.botAvatar}>
-                                    <MaterialCommunityIcons name="robot-happy" size={22} color={COLORS.textWhite} />
+                                <View style={[styles.botAvatar, { backgroundColor: G.midGreen }]}>
+                                    <MaterialCommunityIcons name="robot-happy" size={22} color="#fff" />
                                 </View>
                                 <View>
-                                    <Text style={styles.headerTitle}>RoadSafe AI</Text>
-                                    <Text style={styles.headerSubtitle}>Road Safety Assistant</Text>
+                                    <Text style={[styles.headerTitle, { color: G.text }]}>RoadSafe AI</Text>
+                                    <Text style={[styles.headerSubtitle, { color: G.sub }]}>Road Safety Assistant</Text>
                                 </View>
                             </View>
-                            <TouchableOpacity onPress={() => setVisible(false)} style={styles.closeBtn}>
-                                <MaterialCommunityIcons name="close" size={22} color={COLORS.textSecondary} />
+                            <TouchableOpacity onPress={() => setVisible(false)} style={[styles.closeBtn, { backgroundColor: G.chipBg }]}>
+                                <MaterialCommunityIcons name="close" size={22} color={G.sub} />
                             </TouchableOpacity>
                         </View>
 
                         {/* Chat Area */}
                         <ScrollView
                             ref={scrollViewRef}
-                            style={styles.chatArea}
+                            style={[styles.chatArea, { backgroundColor: G.bg }]}
                             contentContainerStyle={{ padding: SPACING.lg, paddingBottom: SPACING.xxl }}
                             keyboardShouldPersistTaps="handled"
                         >
@@ -209,32 +206,33 @@ export default function ChatbotFAB() {
                                     disabled={!item.isError || loading}
                                     style={[
                                         styles.bubble,
-                                        item.sender === 'user' ? styles.userBubble : styles.botBubble,
-                                        item.isError && styles.errorBubble,
+                                        item.sender === 'user'
+                                            ? [styles.userBubble, { backgroundColor: G.darkGreen }]
+                                            : [styles.botBubble, { backgroundColor: isDark ? '#1A3A2A' : G.darkGreen }],
+                                        item.isError && { backgroundColor: isDark ? '#3A1A1A' : '#FEE2E2', borderWidth: 1, borderColor: isDark ? '#5A2A2A' : '#FECACA' },
                                     ]}
                                 >
                                     <Text
                                         style={[
                                             styles.bubbleText,
-                                            item.sender === 'user' ? styles.userText : styles.botText,
-                                            item.isError && styles.errorText,
+                                            item.isError ? { color: G.red } : { color: '#fff' },
                                         ]}
                                     >
                                         {item.text}
                                     </Text>
                                     {item.isError && (
                                         <View style={styles.retryHint}>
-                                            <MaterialCommunityIcons name="refresh" size={14} color={COLORS.accentRed} />
-                                            <Text style={styles.retryText}>Tap to retry</Text>
+                                            <MaterialCommunityIcons name="refresh" size={14} color={G.red} />
+                                            <Text style={[styles.retryText, { color: G.red }]}>Tap to retry</Text>
                                         </View>
                                     )}
                                 </TouchableOpacity>
                             ))}
 
                             {loading && (
-                                <View style={[styles.bubble, styles.botBubble, { paddingVertical: 14 }]}>
+                                <View style={[styles.bubble, styles.botBubble, { paddingVertical: 14, backgroundColor: isDark ? '#1A3A2A' : G.darkGreen }]}>
                                     <View style={styles.typingIndicator}>
-                                        <ActivityIndicator color={COLORS.textWhite} size="small" />
+                                        <ActivityIndicator color="#fff" size="small" />
                                         <Text style={styles.typingText}>Thinking...</Text>
                                     </View>
                                 </View>
@@ -242,11 +240,11 @@ export default function ChatbotFAB() {
                         </ScrollView>
 
                         {/* Input Bar */}
-                        <View style={styles.inputBar}>
+                        <View style={[styles.inputBar, { backgroundColor: G.card, borderTopColor: G.border }]}>
                             <TextInput
-                                style={styles.input}
+                                style={[styles.input, { backgroundColor: G.inputBg, borderColor: G.border, color: G.text }]}
                                 placeholder="Ask about road safety..."
-                                placeholderTextColor={COLORS.textLight}
+                                placeholderTextColor={G.sub}
                                 value={message}
                                 onChangeText={setMessage}
                                 onSubmitEditing={handleSend}
@@ -255,11 +253,11 @@ export default function ChatbotFAB() {
                                 editable={!loading}
                             />
                             <TouchableOpacity
-                                style={[styles.sendBtn, (!message.trim() || loading) && styles.sendBtnDisabled]}
+                                style={[styles.sendBtn, { backgroundColor: G.midGreen }, (!message.trim() || loading) && styles.sendBtnDisabled]}
                                 onPress={handleSend}
                                 disabled={!message.trim() || loading}
                             >
-                                <MaterialCommunityIcons name="send" size={20} color={COLORS.textWhite} />
+                                <MaterialCommunityIcons name="send" size={20} color="#fff" />
                             </TouchableOpacity>
                         </View>
                     </KeyboardAvoidingView>
@@ -272,182 +270,54 @@ export default function ChatbotFAB() {
 const styles = StyleSheet.create({
     // FAB
     fabContainer: {
-        position: 'absolute',
-        bottom: 95,
-        right: 20,
-        zIndex: 999,
-        alignItems: 'center',
-        justifyContent: 'center',
+        position: 'absolute', bottom: 95, right: 20, zIndex: 999,
+        alignItems: 'center', justifyContent: 'center',
     },
-    fabGlow: {
-        position: 'absolute',
-        width: 62,
-        height: 62,
-        borderRadius: 31,
-        backgroundColor: COLORS.emerald,
-        opacity: 0.25,
-    },
+    fabGlow: { position: 'absolute', width: 62, height: 62, borderRadius: 31, opacity: 0.25 },
     fab: {
-        width: 52,
-        height: 52,
-        borderRadius: 26,
-        backgroundColor: COLORS.emerald,
-        justifyContent: 'center',
-        alignItems: 'center',
-        shadowColor: COLORS.emerald,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.5,
-        shadowRadius: 10,
-        elevation: 8,
+        width: 52, height: 52, borderRadius: 26,
+        justifyContent: 'center', alignItems: 'center',
+        shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.5, shadowRadius: 10, elevation: 8,
     },
 
     // Modal
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: COLORS.overlay,
-        justifyContent: 'flex-end',
-    },
-    modalContainer: {
-        height: '85%',
-        backgroundColor: COLORS.bgCard,
-        borderTopLeftRadius: RADIUS.xl,
-        borderTopRightRadius: RADIUS.xl,
-        overflow: 'hidden',
-    },
+    modalOverlay: { flex: 1, justifyContent: 'flex-end' },
+    modalContainer: { height: '85%', borderTopLeftRadius: RADIUS.xl, borderTopRightRadius: RADIUS.xl, overflow: 'hidden' },
 
     // Header
     modalHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: SPACING.xl,
-        paddingVertical: SPACING.lg,
-        borderBottomWidth: 1,
-        borderBottomColor: COLORS.borderLight,
+        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+        paddingHorizontal: SPACING.xl, paddingVertical: SPACING.lg, borderBottomWidth: 1,
     },
-    headerLeft: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: SPACING.md,
-    },
-    botAvatar: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: COLORS.emerald,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    headerTitle: {
-        fontSize: 17,
-        fontWeight: '700',
-        color: COLORS.textPrimary,
-    },
-    headerSubtitle: {
-        fontSize: 12,
-        color: COLORS.textSecondary,
-        marginTop: 1,
-    },
-    closeBtn: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: COLORS.borderLight,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
+    headerLeft: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md },
+    botAvatar: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
+    headerTitle: { fontSize: 17, fontWeight: '700' },
+    headerSubtitle: { fontSize: 12, marginTop: 1 },
+    closeBtn: { width: 36, height: 36, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
 
     // Chat
-    chatArea: {
-        flex: 1,
-        backgroundColor: COLORS.bgPrimary,
-    },
-    bubble: {
-        padding: SPACING.md,
-        borderRadius: RADIUS.lg,
-        marginVertical: SPACING.xs,
-        maxWidth: '78%',
-    },
-    userBubble: {
-        alignSelf: 'flex-end',
-        backgroundColor: COLORS.emerald,
-        borderBottomRightRadius: SPACING.xs,
-    },
-    botBubble: {
-        alignSelf: 'flex-start',
-        backgroundColor: COLORS.emeraldDark,
-        borderBottomLeftRadius: SPACING.xs,
-    },
-    errorBubble: {
-        backgroundColor: '#FEE2E2',
-        borderWidth: 1,
-        borderColor: '#FECACA',
-    },
-    bubbleText: {
-        fontSize: 15,
-        lineHeight: 21,
-    },
-    userText: {
-        color: COLORS.textWhite,
-    },
-    botText: {
-        color: COLORS.textWhite,
-    },
-    errorText: {
-        color: COLORS.accentRed,
-    },
-    retryHint: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginTop: 6,
-        gap: 4,
-    },
-    retryText: {
-        fontSize: 12,
-        color: COLORS.accentRed,
-        fontWeight: '600',
-    },
-    typingIndicator: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 8,
-    },
-    typingText: {
-        color: COLORS.textWhite,
-        fontSize: 13,
-        fontStyle: 'italic',
-    },
+    chatArea: { flex: 1 },
+    bubble: { padding: SPACING.md, borderRadius: RADIUS.lg, marginVertical: SPACING.xs, maxWidth: '78%' },
+    userBubble: { alignSelf: 'flex-end', borderBottomRightRadius: SPACING.xs },
+    botBubble: { alignSelf: 'flex-start', borderBottomLeftRadius: SPACING.xs },
+    bubbleText: { fontSize: 15, lineHeight: 21 },
+    retryHint: { flexDirection: 'row', alignItems: 'center', marginTop: 6, gap: 4 },
+    retryText: { fontSize: 12, fontWeight: '600' },
+    typingIndicator: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    typingText: { color: '#fff', fontSize: 13, fontStyle: 'italic' },
 
     // Input
     inputBar: {
-        flexDirection: 'row',
-        padding: SPACING.md,
-        backgroundColor: COLORS.bgCard,
-        alignItems: 'center',
-        borderTopWidth: 1,
-        borderTopColor: COLORS.borderLight,
+        flexDirection: 'row', padding: SPACING.md, alignItems: 'center', borderTopWidth: 1,
     },
     input: {
-        flex: 1,
-        backgroundColor: COLORS.bgInput,
-        borderRadius: RADIUS.xl,
-        paddingHorizontal: SPACING.lg,
-        paddingVertical: Platform.OS === 'ios' ? 12 : 10,
-        fontSize: 15,
-        color: COLORS.textPrimary,
-        borderWidth: 1,
-        borderColor: COLORS.border,
+        flex: 1, borderRadius: RADIUS.xl,
+        paddingHorizontal: SPACING.lg, paddingVertical: Platform.OS === 'ios' ? 12 : 10,
+        fontSize: 15, borderWidth: 1,
     },
     sendBtn: {
-        marginLeft: SPACING.sm,
-        backgroundColor: COLORS.emerald,
-        width: 42,
-        height: 42,
-        borderRadius: 21,
-        justifyContent: 'center',
-        alignItems: 'center',
+        marginLeft: SPACING.sm, width: 42, height: 42, borderRadius: 21,
+        justifyContent: 'center', alignItems: 'center',
     },
-    sendBtnDisabled: {
-        opacity: 0.5,
-    },
+    sendBtnDisabled: { opacity: 0.5 },
 });

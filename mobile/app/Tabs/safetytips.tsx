@@ -1,9 +1,8 @@
-// app/Tabs/safetytips.tsx — Safety Guide (Light + Dark Green)
+// app/Tabs/safetytips.tsx — Safety Guide (Light + Dark Theme)
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState } from 'react';
 import {
-  Animated,
   Modal,
   Platform,
   ScrollView,
@@ -14,18 +13,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-// ─── Theme ───
-const G = {
-  bg: '#F4F7F4',
-  card: '#FFFFFF',
-  darkGreen: '#1A4D2E',
-  midGreen: '#2D7A4D',
-  lightGreen: '#E8F5ED',
-  text: '#1A1A1A',
-  sub: '#6B7280',
-  border: '#D1E8D9',
-};
+import { useTheme } from '../context/ThemeContext';
 
 // ─── Content ───
 const SECTIONS = [
@@ -120,6 +108,7 @@ const HEADER_TEXT = {
 
 export default function SafetyTips() {
   const insets = useSafeAreaInsets();
+  const { colors: G, isDark } = useTheme();
   const [isEnglish, setIsEnglish] = useState(true);
   const lang = isEnglish ? 'en' : 'ur';
   const [openKeys, setOpenKeys] = useState<Record<string, boolean>>({});
@@ -137,11 +126,11 @@ export default function SafetyTips() {
   ];
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <View style={[styles.root, { backgroundColor: G.bg, paddingTop: insets.top }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
 
         {/* ─── Hero ─── */}
-        <LinearGradient colors={[G.darkGreen, G.midGreen]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.hero, { paddingTop: insets.top + 12 }]}>
+        <LinearGradient colors={G.gradientHero} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[styles.hero, { paddingTop: insets.top + 12 }]}>
           <View style={styles.heroDeco} />
           <View style={styles.heroRow}>
             <View style={styles.heroIconWrap}>
@@ -176,25 +165,31 @@ export default function SafetyTips() {
             const isOpen = !!openKeys[section.key];
             const items = section[lang];
             return (
-              <View key={section.key} style={styles.card}>
+              <View key={section.key} style={[styles.card, {
+                backgroundColor: G.card, borderColor: G.border,
+                ...Platform.select({
+                  ios: { shadowColor: isDark ? '#000' : G.darkGreen, shadowOffset: { width: 0, height: 3 }, shadowOpacity: isDark ? 0.3 : 0.08, shadowRadius: 10 },
+                  android: { elevation: 3 },
+                }),
+              }]}>
                 <TouchableOpacity style={styles.cardHeader} onPress={() => toggle(section.key)} activeOpacity={0.7}>
                   <View style={[styles.cardIconWrap, { backgroundColor: section.color + '18' }]}>
                     <MaterialCommunityIcons name={section.icon} size={20} color={section.color} />
                   </View>
-                  <Text style={styles.cardTitle}>{section.title[lang]}</Text>
-                  <View style={[styles.chevronWrap, isOpen && { backgroundColor: G.lightGreen }]}>
+                  <Text style={[styles.cardTitle, { color: G.text }]}>{section.title[lang]}</Text>
+                  <View style={[styles.chevronWrap, { backgroundColor: isDark ? G.chipBg : '#F3F4F6' }, isOpen && { backgroundColor: G.lightGreen }]}>
                     <Ionicons name={isOpen ? 'chevron-up' : 'chevron-down'} size={18} color={isOpen ? G.midGreen : G.sub} />
                   </View>
                 </TouchableOpacity>
 
                 {isOpen && (
-                  <View style={styles.cardContent}>
+                  <View style={[styles.cardContent, { borderTopColor: G.border }]}>
                     {items.map((item: string, i: number) => (
                       <View key={i} style={styles.tipRow}>
-                        <View style={styles.tipDot}>
-                          <Text style={styles.tipNum}>{i + 1}</Text>
+                        <View style={[styles.tipDot, { backgroundColor: G.lightGreen }]}>
+                          <Text style={[styles.tipNum, { color: G.midGreen }]}>{i + 1}</Text>
                         </View>
-                        <Text style={styles.tipText}>{item}</Text>
+                        <Text style={[styles.tipText, { color: isDark ? G.sub : '#374151' }]}>{item}</Text>
                       </View>
                     ))}
                   </View>
@@ -205,7 +200,7 @@ export default function SafetyTips() {
 
           {/* ─── Emergency Contact ─── */}
           <TouchableOpacity onPress={showContacts} activeOpacity={0.88} style={{ marginTop: 6 }}>
-            <LinearGradient colors={[G.darkGreen, G.midGreen]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.contactBtn}>
+            <LinearGradient colors={[G.darkGreen, G.midGreen] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.contactBtn}>
               <MaterialCommunityIcons name="phone-alert" size={20} color="#fff" />
               <Text style={styles.contactText}>
                 {isEnglish ? 'Emergency Contacts' : 'ہنگامی رابطے'}
@@ -223,32 +218,32 @@ export default function SafetyTips() {
           <TouchableWithoutFeedback onPress={() => setContactsVisible(false)}>
             <View style={styles.modalBackdrop} />
           </TouchableWithoutFeedback>
-          <View style={styles.modalCard}>
-            <View style={styles.modalHandle} />
-            <View style={styles.modalIconCircle}>
+          <View style={[styles.modalCard, { backgroundColor: G.modalBg }]}>
+            <View style={[styles.modalHandle, { backgroundColor: isDark ? '#444' : '#E5E7EB' }]} />
+            <View style={[styles.modalIconCircle, { backgroundColor: isDark ? '#3A2020' : '#FEF2F2' }]}>
               <MaterialCommunityIcons name="phone-alert" size={28} color="#E95B5B" />
             </View>
-            <Text style={styles.modalTitle}>
+            <Text style={[styles.modalTitle, { color: G.text }]}>
               {isEnglish ? 'Emergency Contacts' : 'ہنگامی رابطے'}
             </Text>
             {CONTACTS.map((c, i) => (
-              <View key={i} style={[styles.contactRow, i < CONTACTS.length - 1 && styles.contactBorder]}>
+              <View key={i} style={[styles.contactRow, i < CONTACTS.length - 1 && { borderBottomWidth: 1, borderBottomColor: G.divider }]}>
                 <Text style={styles.contactEmoji}>{c.emoji}</Text>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.contactLabel}>{c.label[lang]}</Text>
+                  <Text style={[styles.contactLabel, { color: isDark ? G.text : '#374151' }]}>{c.label[lang]}</Text>
                 </View>
                 <View style={[styles.contactNumBadge, { backgroundColor: c.color + '15' }]}>
                   <Text style={[styles.contactNum, { color: c.color }]}>{c.number}</Text>
                 </View>
               </View>
             ))}
-            <Text style={styles.contactNote}>
+            <Text style={[styles.contactNote, { color: G.sub }]}>
               {isEnglish
                 ? 'Always follow local administration instructions.'
                 : 'ہمیشہ مقامی انتظامیہ کی ہدایات پر عمل کریں۔'}
             </Text>
-            <TouchableOpacity style={styles.contactCloseBtn} onPress={() => setContactsVisible(false)}>
-              <Text style={styles.contactCloseText}>{isEnglish ? 'OK' : 'ٹھیک ہے'}</Text>
+            <TouchableOpacity style={[styles.contactCloseBtn, { backgroundColor: G.lightGreen }]} onPress={() => setContactsVisible(false)}>
+              <Text style={[styles.contactCloseText, { color: G.midGreen }]}>{isEnglish ? 'OK' : 'ٹھیک ہے'}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -258,7 +253,7 @@ export default function SafetyTips() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: G.bg },
+  root: { flex: 1 },
 
   // Hero
   hero: { paddingHorizontal: 20, paddingBottom: 20, overflow: 'hidden' },
@@ -278,99 +273,51 @@ const styles = StyleSheet.create({
   body: { paddingHorizontal: 16, marginTop: 20 },
 
   // Cards
-  card: {
-    backgroundColor: G.card,
-    borderRadius: 20,
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: G.border,
-    overflow: 'hidden',
-    ...Platform.select({
-      ios: { shadowColor: G.darkGreen, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.08, shadowRadius: 10 },
-      android: { elevation: 3 },
-    }),
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    gap: 12,
-  },
-  cardIconWrap: {
-    width: 40, height: 40, borderRadius: 13,
-    justifyContent: 'center', alignItems: 'center',
-  },
-  cardTitle: {
-    flex: 1, fontSize: 15, fontWeight: '700', color: G.text,
-  },
-  chevronWrap: {
-    width: 32, height: 32, borderRadius: 10,
-    backgroundColor: '#F3F4F6',
-    justifyContent: 'center', alignItems: 'center',
-  },
+  card: { borderRadius: 20, marginBottom: 14, borderWidth: 1, overflow: 'hidden' },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 12 },
+  cardIconWrap: { width: 40, height: 40, borderRadius: 13, justifyContent: 'center', alignItems: 'center' },
+  cardTitle: { flex: 1, fontSize: 15, fontWeight: '700' },
+  chevronWrap: { width: 32, height: 32, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
 
   // Card content
-  cardContent: {
-    paddingHorizontal: 16, paddingBottom: 16,
-    borderTopWidth: 1, borderTopColor: G.border,
-    marginTop: 0, paddingTop: 14,
-  },
-  tipRow: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: 10,
-    marginBottom: 10,
-  },
-  tipDot: {
-    width: 24, height: 24, borderRadius: 12,
-    backgroundColor: G.lightGreen,
-    justifyContent: 'center', alignItems: 'center',
-    marginTop: 1,
-  },
-  tipNum: {
-    fontSize: 11, fontWeight: '800', color: G.midGreen,
-  },
-  tipText: {
-    flex: 1, fontSize: 14, lineHeight: 21, color: '#374151',
-  },
+  cardContent: { paddingHorizontal: 16, paddingBottom: 16, borderTopWidth: 1, paddingTop: 14 },
+  tipRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 10 },
+  tipDot: { width: 24, height: 24, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginTop: 1 },
+  tipNum: { fontSize: 11, fontWeight: '800' },
+  tipText: { flex: 1, fontSize: 14, lineHeight: 21 },
 
   // Contact Button
   contactBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 10, padding: 18, borderRadius: 18,
     ...Platform.select({
-      ios: { shadowColor: G.darkGreen, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 14 },
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.3, shadowRadius: 14 },
       android: { elevation: 8 },
     }),
   },
-  contactText: {
-    color: '#fff', fontWeight: '800', fontSize: 15, flex: 1, textAlign: 'center',
-  },
+  contactText: { color: '#fff', fontWeight: '800', fontSize: 15, flex: 1, textAlign: 'center' },
 
   // Emergency Contacts Modal
   modalOverlay: { flex: 1, justifyContent: 'flex-end' },
   modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
   modalCard: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingHorizontal: 24,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 28,
-    paddingTop: 14,
+    borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    paddingHorizontal: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 28, paddingTop: 14,
     alignItems: 'center',
     ...Platform.select({
       ios: { shadowColor: '#000', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.15, shadowRadius: 24 },
       android: { elevation: 20 },
     }),
   },
-  modalHandle: { width: 36, height: 5, borderRadius: 3, backgroundColor: '#E5E7EB', marginBottom: 20 },
-  modalIconCircle: { width: 60, height: 60, borderRadius: 20, backgroundColor: '#FEF2F2', justifyContent: 'center', alignItems: 'center', marginBottom: 14 },
-  modalTitle: { fontSize: 20, fontWeight: '800', color: '#1A1A1A', marginBottom: 20, letterSpacing: -0.3 },
+  modalHandle: { width: 36, height: 5, borderRadius: 3, marginBottom: 20 },
+  modalIconCircle: { width: 60, height: 60, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginBottom: 14 },
+  modalTitle: { fontSize: 20, fontWeight: '800', marginBottom: 20, letterSpacing: -0.3 },
   contactRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14, width: '100%', gap: 14 },
-  contactBorder: { borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
   contactEmoji: { fontSize: 24 },
-  contactLabel: { fontSize: 15, fontWeight: '600', color: '#374151' },
+  contactLabel: { fontSize: 15, fontWeight: '600' },
   contactNumBadge: { paddingHorizontal: 14, paddingVertical: 6, borderRadius: 12 },
   contactNum: { fontSize: 16, fontWeight: '800' },
-  contactNote: { fontSize: 12, color: '#9CA3AF', textAlign: 'center', marginTop: 14, lineHeight: 18 },
-  contactCloseBtn: { marginTop: 16, backgroundColor: G.lightGreen, paddingVertical: 14, paddingHorizontal: 40, borderRadius: 16 },
-  contactCloseText: { fontSize: 15, fontWeight: '700', color: G.midGreen },
+  contactNote: { fontSize: 12, textAlign: 'center', marginTop: 14, lineHeight: 18 },
+  contactCloseBtn: { marginTop: 16, paddingVertical: 14, paddingHorizontal: 40, borderRadius: 16 },
+  contactCloseText: { fontSize: 15, fontWeight: '700' },
 });

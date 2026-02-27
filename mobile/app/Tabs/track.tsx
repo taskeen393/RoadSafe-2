@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   FlatList,
   Linking,
+  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -10,6 +11,7 @@ import {
 } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 import { useToast } from '../../components/ToastContext';
+import { useTheme } from '../context/ThemeContext';
 
 // Import SOS service
 import { sosService } from '../services';
@@ -18,229 +20,182 @@ import { Place } from '../services/types';
 const TYPES = ['hospital', 'police', 'fire_station'];
 
 export default function TrackScreen() {
+  const { showToast } = useToast();
+  const { colors: G, isDark } = useTheme();
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [places, setPlaces] = useState<Place[]>([]);
-  const [selectedType, setSelectedType] = useState<string>('hospital');
+  const [activeType, setActiveType] = useState('hospital');
   const [loading, setLoading] = useState(false);
   const mapRef = useRef<MapView>(null);
-  const { showToast } = useToast();
 
-  // Get user location
   useEffect(() => {
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        showToast({ type: 'warning', title: 'Permission Required', message: 'Location access is needed' });
+        showToast({ type: 'warning', title: 'Permission Denied', message: 'Location access is required for SOS features' });
         return;
       }
       const loc = await Location.getCurrentPositionAsync({});
-      setLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+      setLocation({
+        latitude: loc.coords.latitude,
+        longitude: loc.coords.longitude,
+      });
     })();
   }, []);
 
-  // Fetch nearby places when location or type changes
   useEffect(() => {
-    if (location) fetchNearbyPlaces();
-  }, [location, selectedType]);
+    if (location) fetchPlaces(activeType);
+  }, [location, activeType]);
 
-  const fetchNearbyPlaces = async () => {
+  const fetchPlaces = async (type: string) => {
     if (!location) return;
-
     setLoading(true);
     try {
       const results = await sosService.getNearbyPlaces(
         location.latitude,
         location.longitude,
-        selectedType
+        type
       );
       setPlaces(results);
-      if (results.length > 0) zoomToMarkers(results);
-    } catch (error: any) {
-      showToast({ type: 'error', title: 'Error', message: error.msg || 'Unable to fetch nearby places' });
+    } catch {
+      showToast({ type: 'error', title: 'Error', message: 'Failed to fetch nearby places' });
     } finally {
       setLoading(false);
     }
   };
 
-  const zoomToMarkers = (markers: Place[]) => {
-    if (!mapRef.current) return;
-    const coords = markers.map(m => ({
-      latitude: m.geometry.location.lat,
-      longitude: m.geometry.location.lng,
-    }));
-    mapRef.current.fitToCoordinates(coords, {
-      edgePadding: { top: 80, right: 80, bottom: 300, left: 80 },
-      animated: true,
+  const openDirections = (lat: number, lon: number) => {
+    const url = Platform.select({
+      ios: `maps:0,0?saddr=My+Location&daddr=${lat},${lon}`,
+      android: `google.navigation:q=${lat},${lon}`,
     });
+    if (url) Linking.openURL(url);
   };
 
-  const callPlace = async (placeId: string) => {
-    try {
-      const phone = await sosService.getPlacePhoneNumber(placeId);
-      if (!phone) return showToast({ type: 'info', title: 'Unavailable', message: 'Phone number not available for this place' });
-
-      const supported = await Linking.canOpenURL(`tel:${phone}`);
-      if (supported) Linking.openURL(`tel:${phone}`);
-    } catch {
-      showToast({ type: 'error', title: 'Error', message: 'Call failed' });
+  const getTypeIcon = (type: string) => {
+    switch (type) {
+      case 'hospital': return '🏥';
+      case 'police': return '🚔';
+      case 'fire_station': return '🚒';
+      default: return '📍';
     }
   };
 
-  // SOS Button → call emergency number + send to backend
-  const sosCall = async () => {
-    // Direct emergency call
-    const supported = await Linking.canOpenURL('tel:15');
-    if (supported) Linking.openURL('tel:15');
-
-    // Send SOS to backend using sosService
-    try {
-      await sosService.sendSOSAlert({ user: 'User1', message: 'SOS activated!' });
-      showToast({ type: 'success', title: 'SOS Sent', message: 'Emergency reported to system' });
-    } catch (error: any) {
-      console.error('Backend error:', error);
+  const getTypeColor = (type: string) => {
+    switch (type) {
+      case 'hospital': return '#EF4444';
+      case 'police': return '#3B82F6';
+      case 'fire_station': return '#F97316';
+      default: return '#6B7280';
     }
   };
-
-  if (!location) return <Text style={styles.loading}>Fetching Location...</Text>;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: G.bg }]}>
+      {/* Map */}
       <MapView
         ref={mapRef}
         style={styles.map}
         initialRegion={{
+          latitude: location?.latitude || 24.8607,
+          longitude: location?.longitude || 67.0011,
+          latitudeDelta: 0.05,
+          longitudeDelta: 0.05,
+        }}
+        region={location ? {
           latitude: location.latitude,
           longitude: location.longitude,
           latitudeDelta: 0.05,
           longitudeDelta: 0.05,
-        }}
-        showsUserLocation
+        } : undefined}
       >
-        {places.map(place => (
+        {location && (
+          <Marker coordinate={location} title="You are here" pinColor="#2D7A4D" />
+        )}
+        {places.map((place, i) => (
           <Marker
-            key={place.place_id}
-            coordinate={{
-              latitude: place.geometry.location.lat,
-              longitude: place.geometry.location.lng,
-            }}
+            key={i}
+            coordinate={{ latitude: place.lat, longitude: place.lon }}
             title={place.name}
-            description={place.vicinity}
+            description={place.address}
+            pinColor={getTypeColor(activeType)}
           />
         ))}
       </MapView>
 
-      {/* Filters */}
-      <View style={styles.filters}>
-        {TYPES.map(type => (
-          <TouchableOpacity
-            key={type}
-            style={[styles.filterBtn, selectedType === type && styles.selectedFilter]}
-            onPress={() => setSelectedType(type)}
-          >
-            <Text style={[styles.filterText, selectedType === type && { color: 'white' }]}>
-              {type.toUpperCase()}
+      {/* Bottom Panel */}
+      <View style={[styles.panel, { backgroundColor: G.card, borderColor: G.border }]}>
+        {/* Type Tabs */}
+        <View style={styles.tabs}>
+          {TYPES.map((type) => (
+            <TouchableOpacity
+              key={type}
+              style={[styles.tab, { backgroundColor: activeType === type ? getTypeColor(type) : G.chipBg }]}
+              onPress={() => setActiveType(type)}
+            >
+              <Text style={styles.tabEmoji}>{getTypeIcon(type)}</Text>
+              <Text style={[styles.tabText, { color: activeType === type ? '#fff' : G.text }]}>
+                {type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Places List */}
+        <FlatList
+          data={places}
+          keyExtractor={(_, i) => i.toString()}
+          showsVerticalScrollIndicator={false}
+          style={{ maxHeight: 200 }}
+          ListEmptyComponent={
+            <Text style={[styles.emptyText, { color: G.sub }]}>
+              {loading ? 'Searching nearby...' : 'No places found nearby'}
             </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* SOS Button */}
-      <TouchableOpacity style={styles.sosBtn} onPress={sosCall}>
-        <Text style={styles.sosText}>SOS</Text>
-      </TouchableOpacity>
-
-      {/* Bottom List */}
-      <View style={styles.bottomList}>
-        {loading ? (
-          <Text style={{ padding: 20, textAlign: 'center' }}>Loading...</Text>
-        ) : (
-          <FlatList
-            data={places}
-            keyExtractor={item => item.place_id}
-            renderItem={({ item }) => (
-              <View style={styles.placeItem}>
-                <View>
-                  <Text style={styles.placeName}>{item.name}</Text>
-                  <Text style={styles.placeVicinity}>{item.vicinity}</Text>
-                </View>
-                <TouchableOpacity style={styles.callBtn} onPress={() => callPlace(item.place_id)}>
-                  <Text style={{ color: 'white' }}>Call</Text>
-                </TouchableOpacity>
+          }
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={[styles.placeCard, { backgroundColor: G.inputBg, borderColor: G.border }]}
+              onPress={() => openDirections(item.lat, item.lon)}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.placeIcon, { backgroundColor: getTypeColor(activeType) + '20' }]}>
+                <Text style={{ fontSize: 18 }}>{getTypeIcon(activeType)}</Text>
               </View>
-            )}
-          />
-        )}
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.placeName, { color: G.text }]} numberOfLines={1}>{item.name}</Text>
+                <Text style={[styles.placeAddress, { color: G.sub }]} numberOfLines={1}>{item.address}</Text>
+              </View>
+              <Text style={[styles.dirBtn, { color: G.midGreen }]}>Navigate →</Text>
+            </TouchableOpacity>
+          )}
+        />
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F0F7F2' },
+  container: { flex: 1 },
   map: { flex: 1 },
-  loading: { flex: 1, textAlign: 'center', textAlignVertical: 'center', fontSize: 16, color: '#6B7280' },
-  filters: { position: 'absolute', top: 54, left: 14, flexDirection: 'row' },
-  filterBtn: {
-    backgroundColor: '#fff',
-    padding: 10,
-    paddingHorizontal: 16,
-    marginRight: 8,
-    borderRadius: 20,
-    shadowColor: '#2D7A4D',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 3,
+  panel: {
+    borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 16,
+    borderTopWidth: 1,
+    ...Platform.select({
+      ios: { shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.1, shadowRadius: 12 },
+      android: { elevation: 10 },
+    }),
   },
-  selectedFilter: { backgroundColor: '#2D7A4D' },
-  filterText: { fontWeight: '700', fontSize: 12, color: '#1A1A2E' },
-  sosBtn: {
-    position: 'absolute',
-    right: 20,
-    bottom: 280,
-    backgroundColor: '#EF4444',
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 8,
+  tabs: { flexDirection: 'row', gap: 8, marginBottom: 14 },
+  tab: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 14 },
+  tabEmoji: { fontSize: 14 },
+  tabText: { fontSize: 12, fontWeight: '700' },
+  emptyText: { textAlign: 'center', paddingVertical: 20, fontSize: 14 },
+  placeCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 16,
+    marginBottom: 8, borderWidth: 1,
   },
-  sosText: { color: 'white', fontSize: 18, fontWeight: '800' },
-  bottomList: {
-    position: 'absolute',
-    bottom: 0,
-    width: '100%',
-    maxHeight: 250,
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  placeItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: 14,
-    borderBottomWidth: 1,
-    borderColor: '#F3F4F6',
-    alignItems: 'center',
-  },
-  placeName: { fontSize: 15, fontWeight: '700', color: '#1A1A2E' },
-  placeVicinity: { color: '#6B7280', fontSize: 13, marginTop: 2 },
-  callBtn: {
-    backgroundColor: '#2D7A4D',
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
+  placeIcon: { width: 42, height: 42, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+  placeName: { fontSize: 14, fontWeight: '600' },
+  placeAddress: { fontSize: 12, marginTop: 2 },
+  dirBtn: { fontSize: 12, fontWeight: '700' },
 });

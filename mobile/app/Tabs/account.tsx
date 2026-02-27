@@ -15,6 +15,7 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   TouchableOpacity,
@@ -23,29 +24,18 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 import { userService } from "../services";
 import { useToast } from "../../components/ToastContext";
 import ConfirmDialog from "../../components/ConfirmDialog";
 
 const { width } = Dimensions.get("window");
 
-// ─── Theme ───
-const G = {
-  bg: '#F4F7F4',
-  card: '#FFFFFF',
-  darkGreen: '#1A4D2E',
-  midGreen: '#2D7A4D',
-  lightGreen: '#E8F5ED',
-  text: '#1A1A1A',
-  sub: '#6B7280',
-  border: '#D1E8D9',
-  red: '#EF4444',
-};
-
 export default function AccountScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { user, logout, refreshUser } = useAuth();
+  const { colors: G, isDark, toggleTheme } = useTheme();
 
   const [image, setImage] = useState<string | null>(null);
   const [editingImage, setEditingImage] = useState<string | null>(null);
@@ -206,12 +196,12 @@ export default function AccountScreen() {
   const initials = user?.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : 'U';
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <View style={[styles.root, { backgroundColor: G.bg, paddingTop: insets.top }]}>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
 
         {/* ─── Hero Profile Header ─── */}
         <LinearGradient
-          colors={[G.darkGreen, G.midGreen]}
+          colors={G.gradientHero}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={[styles.hero, { paddingTop: insets.top + 16 }]}
@@ -239,7 +229,7 @@ export default function AccountScreen() {
                     <Text style={styles.avatarInitials}>{initials}</Text>
                   </LinearGradient>
                 )}
-                <View style={styles.cameraBadge}>
+                <View style={[styles.cameraBadge, { backgroundColor: G.midGreen }]}>
                   <Ionicons name="camera" size={14} color="#fff" />
                 </View>
               </View>
@@ -270,33 +260,39 @@ export default function AccountScreen() {
 
         {/* ─── Image Editor ─── */}
         {editingImage && (
-          <View style={styles.editorSection}>
-            <Text style={styles.editorTitle}>Edit Photo</Text>
+          <View style={[styles.editorSection, {
+            backgroundColor: G.card,
+            ...Platform.select({
+              ios: { shadowColor: isDark ? '#000' : G.darkGreen, shadowOffset: { width: 0, height: 4 }, shadowOpacity: isDark ? 0.3 : 0.1, shadowRadius: 14 },
+              android: { elevation: 5 },
+            }),
+          }]}>
+            <Text style={[styles.editorTitle, { color: G.text }]}>Edit Photo</Text>
             <Image source={{ uri: editingImage }} style={styles.preview} />
             <View style={styles.editorRow}>
-              <TouchableOpacity style={styles.editorBtn} onPress={rotateImage}>
+              <TouchableOpacity style={[styles.editorBtn, { backgroundColor: G.inputBg, borderColor: G.border }]} onPress={rotateImage}>
                 <View style={[styles.editorBtnIcon, { backgroundColor: G.lightGreen }]}>
                   <Ionicons name="refresh" size={18} color={G.midGreen} />
                 </View>
-                <Text style={styles.editorBtnText}>Rotate</Text>
+                <Text style={[styles.editorBtnText, { color: G.text }]}>Rotate</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.editorBtn} onPress={flipImage}>
-                <View style={[styles.editorBtnIcon, { backgroundColor: '#EEF2FF' }]}>
+              <TouchableOpacity style={[styles.editorBtn, { backgroundColor: G.inputBg, borderColor: G.border }]} onPress={flipImage}>
+                <View style={[styles.editorBtnIcon, { backgroundColor: isDark ? '#2A2A4A' : '#EEF2FF' }]}>
                   <Ionicons name="swap-horizontal" size={18} color="#6366F1" />
                 </View>
-                <Text style={styles.editorBtnText}>Flip</Text>
+                <Text style={[styles.editorBtnText, { color: G.text }]}>Flip</Text>
               </TouchableOpacity>
             </View>
             <View style={styles.editorActions}>
-              <TouchableOpacity style={styles.cancelEditBtn} onPress={() => setEditingImage(null)}>
-                <Text style={styles.cancelEditText}>Cancel</Text>
+              <TouchableOpacity style={[styles.cancelEditBtn, { backgroundColor: G.chipBg }]} onPress={() => setEditingImage(null)}>
+                <Text style={[styles.cancelEditText, { color: G.sub }]}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.saveEditBtn, isUploading && { opacity: 0.6 }]}
                 onPress={saveImage}
                 disabled={isUploading}
               >
-                <LinearGradient colors={[G.darkGreen, G.midGreen]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.saveEditGrad}>
+                <LinearGradient colors={[G.darkGreen, G.midGreen] as [string, string]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.saveEditGrad}>
                   <Ionicons name={isUploading ? "cloud-upload" : "checkmark"} size={18} color="#fff" />
                   <Text style={styles.saveEditText}>{isUploading ? 'Uploading...' : 'Save Photo'}</Text>
                 </LinearGradient>
@@ -309,62 +305,94 @@ export default function AccountScreen() {
         <View style={styles.body}>
 
           {/* Info Card */}
-          <View style={styles.infoCard}>
+          <View style={[styles.infoCard, {
+            backgroundColor: G.card,
+            ...Platform.select({
+              ios: { shadowColor: isDark ? '#000' : G.darkGreen, shadowOffset: { width: 0, height: 3 }, shadowOpacity: isDark ? 0.3 : 0.08, shadowRadius: 12 },
+              android: { elevation: 3 },
+            }),
+          }]}>
             <View style={styles.infoCardHeader}>
-              <View style={styles.infoIconWrap}>
+              <View style={[styles.infoIconWrap, { backgroundColor: G.lightGreen }]}>
                 <Ionicons name="person" size={16} color={G.midGreen} />
               </View>
-              <Text style={styles.infoCardTitle}>Personal Information</Text>
-              <TouchableOpacity onPress={openEditProfile} style={styles.editBtnSmall}>
+              <Text style={[styles.infoCardTitle, { color: G.text }]}>Personal Information</Text>
+              <TouchableOpacity onPress={openEditProfile} style={[styles.editBtnSmall, { backgroundColor: G.lightGreen }]}>
                 <Ionicons name="create-outline" size={14} color={G.midGreen} />
-                <Text style={styles.editBtnSmallText}>Edit</Text>
+                <Text style={[styles.editBtnSmallText, { color: G.midGreen }]}>Edit</Text>
               </TouchableOpacity>
             </View>
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Full Name</Text>
-              <Text style={styles.infoValue}>{user?.name || 'Not set'}</Text>
+              <Text style={[styles.infoLabel, { color: G.sub }]}>Full Name</Text>
+              <Text style={[styles.infoValue, { color: G.text }]}>{user?.name || 'Not set'}</Text>
             </View>
-            <View style={styles.infoDivider} />
+            <View style={[styles.infoDivider, { backgroundColor: G.divider }]} />
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Email</Text>
-              <Text style={styles.infoValue}>{user?.email || 'Not set'}</Text>
+              <Text style={[styles.infoLabel, { color: G.sub }]}>Email</Text>
+              <Text style={[styles.infoValue, { color: G.text }]}>{user?.email || 'Not set'}</Text>
             </View>
           </View>
 
           {/* Menu Items */}
-          <View style={styles.menuCard}>
+          <View style={[styles.menuCard, {
+            backgroundColor: G.card,
+            ...Platform.select({
+              ios: { shadowColor: isDark ? '#000' : G.darkGreen, shadowOffset: { width: 0, height: 3 }, shadowOpacity: isDark ? 0.3 : 0.08, shadowRadius: 12 },
+              android: { elevation: 3 },
+            }),
+          }]}>
             <TouchableOpacity style={styles.menuRow} onPress={pickImage} activeOpacity={0.7}>
               <View style={[styles.menuIconWrap, { backgroundColor: G.midGreen + '15' }]}>
                 <Ionicons name="camera-outline" size={20} color={G.midGreen} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.menuLabel}>Change Photo</Text>
-                <Text style={styles.menuSub}>Update your profile picture</Text>
+                <Text style={[styles.menuLabel, { color: G.text }]}>Change Photo</Text>
+                <Text style={[styles.menuSub, { color: G.sub }]}>Update your profile picture</Text>
               </View>
-              <Ionicons name="chevron-forward" size={16} color="#D1D5DB" />
+              <Ionicons name="chevron-forward" size={16} color={G.sub} />
             </TouchableOpacity>
 
-            <View style={styles.menuRowBorder} />
+            <View style={[styles.menuRowBorder, { backgroundColor: G.divider }]} />
 
             <TouchableOpacity style={styles.menuRow} onPress={openEditProfile} activeOpacity={0.7}>
               <View style={[styles.menuIconWrap, { backgroundColor: '#8B5CF6' + '15' }]}>
                 <Ionicons name="create-outline" size={20} color="#8B5CF6" />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.menuLabel}>Edit Profile</Text>
-                <Text style={styles.menuSub}>Update your name and email</Text>
+                <Text style={[styles.menuLabel, { color: G.text }]}>Edit Profile</Text>
+                <Text style={[styles.menuSub, { color: G.sub }]}>Update your name and email</Text>
               </View>
-              <Ionicons name="chevron-forward" size={16} color="#D1D5DB" />
+              <Ionicons name="chevron-forward" size={16} color={G.sub} />
             </TouchableOpacity>
+
+            <View style={[styles.menuRowBorder, { backgroundColor: G.divider }]} />
+
+            {/* ─── Dark Mode Toggle ─── */}
+            <View style={styles.menuRow}>
+              <View style={[styles.menuIconWrap, { backgroundColor: isDark ? '#3A3A1A' : '#FEF3C7' }]}>
+                <Ionicons name={isDark ? 'moon' : 'sunny'} size={20} color={isDark ? '#FBBF24' : '#D97706'} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.menuLabel, { color: G.text }]}>Dark Mode</Text>
+                <Text style={[styles.menuSub, { color: G.sub }]}>{isDark ? 'Switch to light theme' : 'Switch to dark theme'}</Text>
+              </View>
+              <Switch
+                value={isDark}
+                onValueChange={toggleTheme}
+                trackColor={{ false: '#D1D5DB', true: G.midGreen }}
+                thumbColor={isDark ? '#FBBF24' : '#fff'}
+                ios_backgroundColor="#D1D5DB"
+              />
+            </View>
           </View>
 
           {/* Logout */}
-          <TouchableOpacity style={styles.logoutCard} onPress={handleLogout} activeOpacity={0.85}>
-            <View style={styles.logoutIconWrap}>
+          <TouchableOpacity style={[styles.logoutCard, { backgroundColor: isDark ? '#2A1A1A' : '#FEF2F2', borderColor: isDark ? '#5A2A2A' : '#FECACA' }]} onPress={handleLogout} activeOpacity={0.85}>
+            <View style={[styles.logoutIconWrap, { backgroundColor: isDark ? '#3A1A1A' : '#FEE2E2' }]}>
               <Ionicons name="log-out-outline" size={20} color={G.red} />
             </View>
-            <Text style={styles.logoutText}>Logout</Text>
-            <Ionicons name="chevron-forward" size={16} color="#FECACA" />
+            <Text style={[styles.logoutText, { color: G.red }]}>Logout</Text>
+            <Ionicons name="chevron-forward" size={16} color={isDark ? '#EF4444' : '#FECACA'} />
           </TouchableOpacity>
         </View>
 
@@ -377,32 +405,32 @@ export default function AccountScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
           <View style={styles.modalOverlay}>
-            <View style={styles.modalCard}>
+            <View style={[styles.modalCard, { backgroundColor: G.modalBg }]}>
               {/* Modal Header */}
               <View style={styles.modalHeader}>
-                <LinearGradient colors={[G.darkGreen, G.midGreen]} style={styles.modalHeaderIcon}>
+                <LinearGradient colors={[G.darkGreen, G.midGreen] as [string, string]} style={styles.modalHeaderIcon}>
                   <Ionicons name="person" size={18} color="#fff" />
                 </LinearGradient>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.modalTitle}>Edit Profile</Text>
-                  <Text style={styles.modalSubtitle}>Update your personal information</Text>
+                  <Text style={[styles.modalTitle, { color: G.text }]}>Edit Profile</Text>
+                  <Text style={[styles.modalSubtitle, { color: G.sub }]}>Update your personal information</Text>
                 </View>
-                <TouchableOpacity onPress={() => setEditModalVisible(false)} style={styles.modalCloseBtn}>
+                <TouchableOpacity onPress={() => setEditModalVisible(false)} style={[styles.modalCloseBtn, { backgroundColor: G.chipBg }]}>
                   <Ionicons name="close" size={20} color={G.sub} />
                 </TouchableOpacity>
               </View>
 
               {/* Name Field */}
               <View style={styles.fieldWrap}>
-                <Text style={styles.fieldLabel}>Full Name</Text>
-                <View style={styles.inputWrap}>
+                <Text style={[styles.fieldLabel, { color: G.text }]}>Full Name</Text>
+                <View style={[styles.inputWrap, { backgroundColor: G.inputBg, borderColor: G.border }]}>
                   <Ionicons name="person-outline" size={18} color={G.sub} style={{ marginRight: 10 }} />
                   <TextInput
-                    style={styles.textInput}
+                    style={[styles.textInput, { color: G.text }]}
                     value={editName}
                     onChangeText={setEditName}
                     placeholder="Enter your name"
-                    placeholderTextColor="#B0B7C3"
+                    placeholderTextColor={G.sub}
                     autoCapitalize="words"
                   />
                 </View>
@@ -410,15 +438,15 @@ export default function AccountScreen() {
 
               {/* Email Field */}
               <View style={styles.fieldWrap}>
-                <Text style={styles.fieldLabel}>Email Address</Text>
-                <View style={styles.inputWrap}>
+                <Text style={[styles.fieldLabel, { color: G.text }]}>Email Address</Text>
+                <View style={[styles.inputWrap, { backgroundColor: G.inputBg, borderColor: G.border }]}>
                   <Ionicons name="mail-outline" size={18} color={G.sub} style={{ marginRight: 10 }} />
                   <TextInput
-                    style={styles.textInput}
+                    style={[styles.textInput, { color: G.text }]}
                     value={editEmail}
                     onChangeText={setEditEmail}
                     placeholder="Enter your email"
-                    placeholderTextColor="#B0B7C3"
+                    placeholderTextColor={G.sub}
                     keyboardType="email-address"
                     autoCapitalize="none"
                   />
@@ -428,10 +456,10 @@ export default function AccountScreen() {
               {/* Action Buttons */}
               <View style={styles.modalActions}>
                 <TouchableOpacity
-                  style={styles.modalCancelBtn}
+                  style={[styles.modalCancelBtn, { backgroundColor: G.chipBg }]}
                   onPress={() => setEditModalVisible(false)}
                 >
-                  <Text style={styles.modalCancelText}>Cancel</Text>
+                  <Text style={[styles.modalCancelText, { color: G.sub }]}>Cancel</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -440,7 +468,7 @@ export default function AccountScreen() {
                   disabled={isSavingProfile}
                 >
                   <LinearGradient
-                    colors={[G.darkGreen, G.midGreen]}
+                    colors={[G.darkGreen, G.midGreen] as [string, string]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 1, y: 0 }}
                     style={styles.modalSaveGrad}
@@ -478,7 +506,7 @@ export default function AccountScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: G.bg },
+  root: { flex: 1 },
 
   // Hero
   hero: { paddingBottom: 30, overflow: 'hidden' },
@@ -494,20 +522,12 @@ const styles = StyleSheet.create({
   // Avatar
   avatarSection: { alignItems: 'center', paddingTop: 20 },
   avatarContainer: { position: 'relative', marginBottom: 16 },
-  avatar: {
-    width: 110, height: 110, borderRadius: 55,
-    borderWidth: 3, borderColor: 'rgba(255,255,255,0.4)',
-  },
-  avatarFallback: {
-    width: 110, height: 110, borderRadius: 55,
-    justifyContent: 'center', alignItems: 'center',
-    borderWidth: 3, borderColor: 'rgba(255,255,255,0.3)',
-  },
+  avatar: { width: 110, height: 110, borderRadius: 55, borderWidth: 3, borderColor: 'rgba(255,255,255,0.4)' },
+  avatarFallback: { width: 110, height: 110, borderRadius: 55, justifyContent: 'center', alignItems: 'center', borderWidth: 3, borderColor: 'rgba(255,255,255,0.3)' },
   avatarInitials: { fontSize: 36, fontWeight: '800', color: '#fff' },
   cameraBadge: {
     position: 'absolute', bottom: 4, right: 4,
     width: 34, height: 34, borderRadius: 17,
-    backgroundColor: G.midGreen,
     justifyContent: 'center', alignItems: 'center',
     borderWidth: 3, borderColor: '#fff',
     ...Platform.select({
@@ -533,135 +553,69 @@ const styles = StyleSheet.create({
   body: { paddingHorizontal: 16, marginTop: 20 },
 
   // Info Card
-  infoCard: {
-    backgroundColor: G.card, borderRadius: 20, padding: 18, marginBottom: 16,
-    ...Platform.select({
-      ios: { shadowColor: G.darkGreen, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.08, shadowRadius: 12 },
-      android: { elevation: 3 },
-    }),
-  },
+  infoCard: { borderRadius: 20, padding: 18, marginBottom: 16 },
   infoCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 },
-  infoIconWrap: { width: 34, height: 34, borderRadius: 11, backgroundColor: G.lightGreen, justifyContent: 'center', alignItems: 'center' },
-  infoCardTitle: { fontSize: 15, fontWeight: '700', color: G.text, flex: 1 },
-  editBtnSmall: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: G.lightGreen, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10,
-  },
-  editBtnSmallText: { fontSize: 12, fontWeight: '700', color: G.midGreen },
+  infoIconWrap: { width: 34, height: 34, borderRadius: 11, justifyContent: 'center', alignItems: 'center' },
+  infoCardTitle: { fontSize: 15, fontWeight: '700', flex: 1 },
+  editBtnSmall: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10 },
+  editBtnSmallText: { fontSize: 12, fontWeight: '700' },
   infoRow: { paddingVertical: 8 },
-  infoLabel: { fontSize: 11, fontWeight: '600', color: G.sub, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
-  infoValue: { fontSize: 16, fontWeight: '600', color: G.text },
-  infoDivider: { height: 1, backgroundColor: '#F3F4F6', marginVertical: 4 },
+  infoLabel: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
+  infoValue: { fontSize: 16, fontWeight: '600' },
+  infoDivider: { height: 1, marginVertical: 4 },
 
   // Menu Card
-  menuCard: {
-    backgroundColor: G.card, borderRadius: 20, paddingVertical: 4, marginBottom: 16,
-    ...Platform.select({
-      ios: { shadowColor: G.darkGreen, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.08, shadowRadius: 12 },
-      android: { elevation: 3 },
-    }),
-  },
+  menuCard: { borderRadius: 20, paddingVertical: 4, marginBottom: 16 },
   menuRow: { flexDirection: 'row', alignItems: 'center', padding: 16, gap: 14 },
-  menuRowBorder: { height: 1, backgroundColor: '#F3F4F6', marginHorizontal: 16 },
+  menuRowBorder: { height: 1, marginHorizontal: 16 },
   menuIconWrap: { width: 42, height: 42, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
-  menuLabel: { fontSize: 15, fontWeight: '600', color: G.text },
-  menuSub: { fontSize: 12, color: G.sub, marginTop: 2 },
+  menuLabel: { fontSize: 15, fontWeight: '600' },
+  menuSub: { fontSize: 12, marginTop: 2 },
 
   // Logout
   logoutCard: {
-    backgroundColor: '#FEF2F2', borderRadius: 20, flexDirection: 'row',
+    borderRadius: 20, flexDirection: 'row',
     alignItems: 'center', padding: 16, gap: 14, marginBottom: 20,
-    borderWidth: 1, borderColor: '#FECACA',
+    borderWidth: 1,
   },
-  logoutIconWrap: { width: 42, height: 42, borderRadius: 14, backgroundColor: '#FEE2E2', justifyContent: 'center', alignItems: 'center' },
-  logoutText: { flex: 1, fontSize: 15, fontWeight: '700', color: G.red },
+  logoutIconWrap: { width: 42, height: 42, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+  logoutText: { flex: 1, fontSize: 15, fontWeight: '700' },
 
   // Image Editor
-  editorSection: {
-    marginHorizontal: 16, marginTop: 20,
-    backgroundColor: G.card, borderRadius: 22, padding: 18,
-    ...Platform.select({
-      ios: { shadowColor: G.darkGreen, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 14 },
-      android: { elevation: 5 },
-    }),
-  },
-  editorTitle: { fontSize: 16, fontWeight: '700', color: G.text, marginBottom: 14 },
+  editorSection: { marginHorizontal: 16, marginTop: 20, borderRadius: 22, padding: 18 },
+  editorTitle: { fontSize: 16, fontWeight: '700', marginBottom: 14 },
   preview: { width: '100%', height: width * 0.75, borderRadius: 16, marginBottom: 14 },
   editorRow: { flexDirection: 'row', gap: 12, marginBottom: 14 },
-  editorBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: '#F9FAFB', borderRadius: 14, padding: 14,
-    borderWidth: 1, borderColor: '#E5E7EB',
-  },
+  editorBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 14, padding: 14, borderWidth: 1 },
   editorBtnIcon: { width: 36, height: 36, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
-  editorBtnText: { fontSize: 14, fontWeight: '600', color: G.text },
+  editorBtnText: { fontSize: 14, fontWeight: '600' },
   editorActions: { flexDirection: 'row', gap: 10 },
-  cancelEditBtn: {
-    flex: 1, alignItems: 'center', justifyContent: 'center',
-    paddingVertical: 14, borderRadius: 14, backgroundColor: '#F3F4F6',
-  },
-  cancelEditText: { fontSize: 15, fontWeight: '600', color: G.sub },
+  cancelEditBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: 14 },
+  cancelEditText: { fontSize: 15, fontWeight: '600' },
   saveEditBtn: { flex: 2, borderRadius: 14, overflow: 'hidden' },
-  saveEditGrad: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 8, paddingVertical: 14,
-  },
+  saveEditGrad: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14 },
   saveEditText: { fontSize: 15, fontWeight: '700', color: '#fff' },
 
   // ─── Edit Profile Modal ───
-  modalOverlay: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalCard: {
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 28, borderTopRightRadius: 28,
-    padding: 24, paddingBottom: 36,
-  },
-  modalHeader: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    marginBottom: 24,
-  },
-  modalHeaderIcon: {
-    width: 42, height: 42, borderRadius: 14,
-    justifyContent: 'center', alignItems: 'center',
-  },
-  modalTitle: { fontSize: 18, fontWeight: '800', color: G.text, letterSpacing: -0.3 },
-  modalSubtitle: { fontSize: 12, color: G.sub, marginTop: 2 },
-  modalCloseBtn: {
-    width: 34, height: 34, borderRadius: 17,
-    backgroundColor: '#F3F4F6',
-    justifyContent: 'center', alignItems: 'center',
-  },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  modalCard: { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingBottom: 36 },
+  modalHeader: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 24 },
+  modalHeaderIcon: { width: 42, height: 42, borderRadius: 14, justifyContent: 'center', alignItems: 'center' },
+  modalTitle: { fontSize: 18, fontWeight: '800', letterSpacing: -0.3 },
+  modalSubtitle: { fontSize: 12, marginTop: 2 },
+  modalCloseBtn: { width: 34, height: 34, borderRadius: 17, justifyContent: 'center', alignItems: 'center' },
 
   // Fields
   fieldWrap: { marginBottom: 18 },
-  fieldLabel: {
-    fontSize: 13, fontWeight: '700', color: G.text,
-    marginBottom: 8, letterSpacing: -0.1,
-  },
-  inputWrap: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#F9FAFB',
-    borderWidth: 1.5, borderColor: G.border,
-    borderRadius: 16, paddingHorizontal: 14, paddingVertical: 4,
-  },
-  textInput: {
-    flex: 1, fontSize: 15, color: G.text, paddingVertical: 12,
-  },
+  fieldLabel: { fontSize: 13, fontWeight: '700', marginBottom: 8, letterSpacing: -0.1 },
+  inputWrap: { flexDirection: 'row', alignItems: 'center', borderWidth: 1.5, borderRadius: 16, paddingHorizontal: 14, paddingVertical: 4 },
+  textInput: { flex: 1, fontSize: 15, paddingVertical: 12 },
 
   // Modal Actions
   modalActions: { flexDirection: 'row', gap: 12, marginTop: 6 },
-  modalCancelBtn: {
-    flex: 1, alignItems: 'center', justifyContent: 'center',
-    paddingVertical: 14, borderRadius: 16,
-    backgroundColor: '#F3F4F6',
-  },
-  modalCancelText: { fontSize: 15, fontWeight: '600', color: G.sub },
+  modalCancelBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: 16 },
+  modalCancelText: { fontSize: 15, fontWeight: '600' },
   modalSaveBtn: { flex: 2, borderRadius: 16, overflow: 'hidden' },
-  modalSaveGrad: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 8, paddingVertical: 14,
-  },
+  modalSaveGrad: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14 },
   modalSaveText: { fontSize: 15, fontWeight: '700', color: '#fff' },
 });

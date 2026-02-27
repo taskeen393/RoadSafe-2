@@ -13,20 +13,9 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useTheme } from '../app/context/ThemeContext';
 
 const { height } = Dimensions.get('window');
-
-// ─── Theme ───
-const G = {
-    darkGreen: '#1A4D2E',
-    midGreen: '#2D7A4D',
-    lightGreen: '#E8F5ED',
-    text: '#1A1A1A',
-    sub: '#6B7280',
-    red: '#EF4444',
-    redLight: '#FEF2F2',
-    redBorder: '#FECACA',
-};
 
 export interface ConfirmDialogProps {
     visible: boolean;
@@ -51,43 +40,29 @@ export default function ConfirmDialog({
     onConfirm,
     onCancel,
 }: ConfirmDialogProps) {
+    const { colors: G, isDark } = useTheme();
     const slideAnim = useRef(new Animated.Value(height)).current;
     const backdropAnim = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
         if (visible) {
             Animated.parallel([
-                Animated.spring(slideAnim, {
-                    toValue: 0,
-                    tension: 65,
-                    friction: 11,
-                    useNativeDriver: true,
-                }),
-                Animated.timing(backdropAnim, {
-                    toValue: 1,
-                    duration: 300,
-                    useNativeDriver: true,
-                }),
+                Animated.spring(slideAnim, { toValue: 0, tension: 65, friction: 11, useNativeDriver: true }),
+                Animated.timing(backdropAnim, { toValue: 1, duration: 300, useNativeDriver: true }),
             ]).start();
         } else {
             Animated.parallel([
-                Animated.timing(slideAnim, {
-                    toValue: height,
-                    duration: 250,
-                    useNativeDriver: true,
-                }),
-                Animated.timing(backdropAnim, {
-                    toValue: 0,
-                    duration: 250,
-                    useNativeDriver: true,
-                }),
+                Animated.timing(slideAnim, { toValue: height, duration: 250, useNativeDriver: true }),
+                Animated.timing(backdropAnim, { toValue: 0, duration: 250, useNativeDriver: true }),
             ]).start();
         }
     }, [visible]);
 
     const iconName = icon || (destructive ? 'warning' : 'help-circle');
     const iconColor = destructive ? G.red : G.midGreen;
-    const iconBg = destructive ? G.redLight : G.lightGreen;
+    const iconBg = destructive
+        ? (isDark ? '#3A1A1A' : '#FEF2F2')
+        : G.lightGreen;
 
     return (
         <Modal visible={visible} transparent animationType="none" statusBarTranslucent>
@@ -98,9 +73,9 @@ export default function ConfirmDialog({
                 </TouchableWithoutFeedback>
 
                 {/* Dialog Card */}
-                <Animated.View style={[styles.card, { transform: [{ translateY: slideAnim }] }]}>
+                <Animated.View style={[styles.card, { backgroundColor: G.modalBg, transform: [{ translateY: slideAnim }] }]}>
                     {/* Drag Handle */}
-                    <View style={styles.handle} />
+                    <View style={[styles.handle, { backgroundColor: isDark ? '#4A4A4A' : '#E5E7EB' }]} />
 
                     {/* Icon */}
                     <View style={[styles.iconCircle, { backgroundColor: iconBg }]}>
@@ -108,19 +83,19 @@ export default function ConfirmDialog({
                     </View>
 
                     {/* Title */}
-                    <Text style={styles.title}>{title}</Text>
+                    <Text style={[styles.title, { color: G.text }]}>{title}</Text>
 
                     {/* Message */}
-                    <Text style={styles.message}>{message}</Text>
+                    <Text style={[styles.message, { color: G.sub }]}>{message}</Text>
 
                     {/* Buttons */}
                     <View style={styles.btnRow}>
-                        <TouchableOpacity style={styles.cancelBtn} onPress={onCancel} activeOpacity={0.7}>
-                            <Text style={styles.cancelText}>{cancelText}</Text>
+                        <TouchableOpacity style={[styles.cancelBtn, { backgroundColor: G.chipBg }]} onPress={onCancel} activeOpacity={0.7}>
+                            <Text style={[styles.cancelText, { color: G.sub }]}>{cancelText}</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                            style={[styles.confirmBtnWrap]}
+                            style={styles.confirmBtnWrap}
                             onPress={onConfirm}
                             activeOpacity={0.85}
                         >
@@ -131,7 +106,7 @@ export default function ConfirmDialog({
                                 </View>
                             ) : (
                                 <LinearGradient
-                                    colors={[G.darkGreen, G.midGreen]}
+                                    colors={[G.darkGreen, G.midGreen] as [string, string]}
                                     start={{ x: 0, y: 0 }}
                                     end={{ x: 1, y: 0 }}
                                     style={styles.confirmInner}
@@ -149,97 +124,25 @@ export default function ConfirmDialog({
 }
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        justifyContent: 'flex-end',
-    },
-    backdrop: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'rgba(0,0,0,0.5)',
-    },
+    container: { flex: 1, justifyContent: 'flex-end' },
+    backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
     card: {
-        backgroundColor: '#fff',
-        borderTopLeftRadius: 28,
-        borderTopRightRadius: 28,
-        paddingHorizontal: 24,
-        paddingBottom: Platform.OS === 'ios' ? 40 : 28,
-        paddingTop: 14,
-        alignItems: 'center',
+        borderTopLeftRadius: 28, borderTopRightRadius: 28,
+        paddingHorizontal: 24, paddingBottom: Platform.OS === 'ios' ? 40 : 28,
+        paddingTop: 14, alignItems: 'center',
         ...Platform.select({
-            ios: {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: -8 },
-                shadowOpacity: 0.15,
-                shadowRadius: 24,
-            },
+            ios: { shadowColor: '#000', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.15, shadowRadius: 24 },
             android: { elevation: 20 },
         }),
     },
-    handle: {
-        width: 36,
-        height: 5,
-        borderRadius: 3,
-        backgroundColor: '#E5E7EB',
-        marginBottom: 20,
-    },
-    iconCircle: {
-        width: 60,
-        height: 60,
-        borderRadius: 20,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 16,
-    },
-    title: {
-        fontSize: 20,
-        fontWeight: '800',
-        color: '#1A1A1A',
-        textAlign: 'center',
-        letterSpacing: -0.3,
-        marginBottom: 8,
-    },
-    message: {
-        fontSize: 14,
-        color: '#6B7280',
-        textAlign: 'center',
-        lineHeight: 21,
-        marginBottom: 24,
-        paddingHorizontal: 10,
-    },
-    btnRow: {
-        flexDirection: 'row',
-        gap: 12,
-        width: '100%',
-    },
-    cancelBtn: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 16,
-        borderRadius: 16,
-        backgroundColor: '#F3F4F6',
-    },
-    cancelText: {
-        fontSize: 15,
-        fontWeight: '600',
-        color: '#6B7280',
-    },
-    confirmBtnWrap: {
-        flex: 1.5,
-        borderRadius: 16,
-        overflow: 'hidden',
-    },
-    confirmInner: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
-        paddingVertical: 16,
-        borderRadius: 16,
-    },
-    confirmText: {
-        fontSize: 15,
-        fontWeight: '700',
-        color: '#fff',
-    },
+    handle: { width: 36, height: 5, borderRadius: 3, marginBottom: 20 },
+    iconCircle: { width: 60, height: 60, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
+    title: { fontSize: 20, fontWeight: '800', textAlign: 'center', letterSpacing: -0.3, marginBottom: 8 },
+    message: { fontSize: 14, textAlign: 'center', lineHeight: 21, marginBottom: 24, paddingHorizontal: 10 },
+    btnRow: { flexDirection: 'row', gap: 12, width: '100%' },
+    cancelBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 16, borderRadius: 16 },
+    cancelText: { fontSize: 15, fontWeight: '600' },
+    confirmBtnWrap: { flex: 1.5, borderRadius: 16, overflow: 'hidden' },
+    confirmInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16, borderRadius: 16 },
+    confirmText: { fontSize: 15, fontWeight: '700', color: '#fff' },
 });
