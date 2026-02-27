@@ -112,7 +112,7 @@ export default function TrackScreen() {
         {location && (
           <Marker coordinate={location} title="You are here" pinColor="#2D7A4D" />
         )}
-        {places.map((place, i) => (
+        {places.map((place:any, i:any) => (
           <Marker
             key={i}
             coordinate={{ latitude: place.lat, longitude: place.lon }}
@@ -152,7 +152,7 @@ export default function TrackScreen() {
               {loading ? 'Searching nearby...' : 'No places found nearby'}
             </Text>
           }
-          renderItem={({ item }) => (
+          renderItem={({ item }:any) => (
             <TouchableOpacity
               style={[styles.placeCard, { backgroundColor: G.inputBg, borderColor: G.border }]}
               onPress={() => openDirections(item.lat, item.lon)}
