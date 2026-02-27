@@ -3,7 +3,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ResizeMode, Video } from 'expo-av';
 import { useFocusEffect } from '@react-navigation/native';
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Dimensions,
@@ -54,9 +54,22 @@ export default function FeedScreen() {
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [totalReports, setTotalReports] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
   const isLoadingRef = useRef(false);
 
   const PAGE_SIZE = 10;
+
+  // ── Filtered reports based on search ───────────────
+  const filteredReports = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return reports;
+    return reports.filter(r =>
+      (r.title && r.title.toLowerCase().includes(q)) ||
+      r.text.toLowerCase().includes(q) ||
+      r.user.toLowerCase().includes(q) ||
+      r.location.toLowerCase().includes(q)
+    );
+  }, [reports, searchQuery]);
 
   // Viewer States
   const [modalVisible, setModalVisible] = useState(false);
@@ -254,9 +267,42 @@ export default function FeedScreen() {
         </View>
       </LinearGradient>
 
+      {/* ─── Search Bar ─── */}
+      <View style={[styles.searchWrap, { backgroundColor: G.bg }]}>
+        <View style={[styles.searchBar, {
+          backgroundColor: G.card,
+          borderColor: isDark ? G.border : 'rgba(0,0,0,0.06)',
+          ...Platform.select({
+            ios: { shadowColor: isDark ? '#000' : '#1A4D2E', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8 },
+            android: { elevation: 2 },
+          }),
+        }]}>
+          <Ionicons name="search" size={18} color={G.sub} />
+          <TextInput
+            style={[styles.searchInput, { color: G.text }]}
+            placeholder="Search reports, users, locations..."
+            placeholderTextColor={G.sub}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            returnKeyType="search"
+            autoCorrect={false}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')} style={[styles.searchClear, { backgroundColor: G.chipBg }]}>
+              <Ionicons name="close" size={14} color={G.sub} />
+            </TouchableOpacity>
+          )}
+        </View>
+        {searchQuery.trim().length > 0 && (
+          <Text style={[styles.searchCount, { color: G.sub }]}>
+            {filteredReports.length} result{filteredReports.length !== 1 ? 's' : ''} found
+          </Text>
+        )}
+      </View>
+
       {/* ─── Feed ─── */}
       <FlatList
-        data={reports}
+        data={filteredReports}
         keyExtractor={item => item._id}
         contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
@@ -625,6 +671,17 @@ const styles = StyleSheet.create({
   editInput: { borderWidth: 1.5, borderRadius: 14, padding: 14, marginBottom: 12, fontSize: 15 },
   editBtns: { flexDirection: 'row', gap: 10, justifyContent: 'flex-end', marginTop: 4 },
   editBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 11, paddingHorizontal: 20, borderRadius: 12 },
+
+  // Search Bar
+  searchWrap: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 4 },
+  searchBar: {
+    flexDirection: 'row', alignItems: 'center', gap: 10,
+    paddingHorizontal: 14, borderRadius: 16, borderWidth: 1,
+    height: 46,
+  },
+  searchInput: { flex: 1, fontSize: 14.5, paddingVertical: 0 },
+  searchClear: { width: 24, height: 24, borderRadius: 12, justifyContent: 'center', alignItems: 'center' },
+  searchCount: { fontSize: 12, fontWeight: '500', marginTop: 8, marginLeft: 4 },
 
   // Loading more
   loadingMore: { alignItems: 'center', paddingVertical: 20, gap: 8, flexDirection: 'row', justifyContent: 'center' },
