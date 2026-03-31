@@ -18,11 +18,11 @@ import {
 } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { reportService } from '../services';
-import { ReportRequest } from '../services/types';
+import { reportService } from '../../services';
+import { ReportRequest } from '../../services/types';
 import { useToast } from '../../components/ToastContext';
 import ActionSheet from '../../components/ActionSheet';
-import { useTheme } from '../context/ThemeContext';
+import { useTheme } from '../../context/ThemeContext';
 
 
 export default function ReportScreen({ navigation }: any) {

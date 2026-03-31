@@ -102,6 +102,14 @@ apiClient.interceptors.response.use(
         if (error.response?.status === 401) {
             // Token expired or invalid - could trigger logout
             console.log('Unauthorized - Token may be expired');
+            SecureStore.deleteItemAsync('token').then(() => {
+                try {
+                    const { router } = require('expo-router');
+                    router.replace('/auth/login');
+                } catch (e) {
+                    console.log('Navigation not ready:', e);
+                }
+            }).catch(e => console.log('Error deleting token:', e));
         }
 
         return Promise.reject(error);

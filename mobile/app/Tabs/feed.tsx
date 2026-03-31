@@ -20,11 +20,11 @@ import {
 import MapView, { Marker } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { reportService } from '../services';
-import { getCurrentUser } from '../services/authService';
+import { reportService } from '../../services';
+import { getCurrentUser } from '../../services/authService';
 import { useToast } from '../../components/ToastContext';
 import ConfirmDialog from '../../components/ConfirmDialog';
-import { useTheme } from '../context/ThemeContext';
+import { useTheme } from '../../context/ThemeContext';
 
 const { width, height } = Dimensions.get('window');
 

@@ -23,9 +23,9 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { useAuth } from "../context/AuthContext";
-import { useTheme } from "../context/ThemeContext";
-import { userService } from "../services";
+import { useAuth } from "../../context/AuthContext";
+import { useTheme } from "../../context/ThemeContext";
+import { userService } from "../../services";
 import { useToast } from "../../components/ToastContext";
 import ConfirmDialog from "../../components/ConfirmDialog";
 

@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useTheme } from '../app/context/ThemeContext';
+import { useTheme } from '../context/ThemeContext';
 
 const { height } = Dimensions.get('window');
 

@@ -19,9 +19,9 @@ import {
   Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext';
-import { weatherService, reportService } from '../services';
+import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
+import { weatherService, reportService } from '../../services';
 import { useFocusEffect } from '@react-navigation/native';
 
 const { width } = Dimensions.get('window');

@@ -11,11 +11,11 @@ import {
 } from 'react-native';
 import MapView, { Marker } from 'react-native-maps';
 import { useToast } from '../../components/ToastContext';
-import { useTheme } from '../context/ThemeContext';
+import { useTheme } from '../../context/ThemeContext';
 
 // Import SOS service
-import { sosService } from '../services';
-import { Place } from '../services/types';
+import { sosService } from '../../services';
+import { Place } from '../../services/types';
 
 const TYPES = ['hospital', 'police', 'fire_station'];
 

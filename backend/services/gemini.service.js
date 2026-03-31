@@ -111,7 +111,7 @@ const buildSystemPrompt = (country) => {
 export const generateRoadSafetyResponse = async (userMessage, country) => {
     // 1. Check if Gemini is configured
     if (!isGeminiConfigured()) {
-        throw new Error('Gemini API key not configured. Set GOOGLE_API_KEY in .env');
+        throw new Error('Gemini API key not configured. Set GEMINI_API_KEY in .env');
     }
 
     // 2. Pre-filter obviously off-topic messages (saves API calls)

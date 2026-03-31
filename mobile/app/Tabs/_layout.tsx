@@ -4,10 +4,10 @@ import * as SecureStore from 'expo-secure-store';
 import React, { useCallback, useState } from 'react';
 import { Platform, StatusBar, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import ReportProvider from '../context/reportcontent';
+import ReportProvider from '../../context/reportcontent';
 import ChatbotFAB from '../../components/ChatbotFAB';
 import { useToast } from '../../components/ToastContext';
-import { useTheme } from '../context/ThemeContext';
+import { useTheme } from '../../context/ThemeContext';
 
 import {
   Ionicons,

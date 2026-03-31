@@ -16,8 +16,8 @@ import {
     View,
 } from 'react-native';
 import { FONT, FONT_SIZE, RADIUS, SPACING } from '../constants/globalStyles';
-import { useTheme } from '../app/context/ThemeContext';
-import { sendMessage } from '../app/services/chatbotService';
+import { useTheme } from '../context/ThemeContext';
+import { sendMessage } from '../services/chatbotService';
 
 type Message = {
     id: number;

@@ -17,10 +17,10 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { authService } from '../services';
-import { useAuth } from '../context/AuthContext';
+import { authService } from '../../services';
+import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../components/ToastContext';
-import { useTheme } from '../context/ThemeContext';
+import { useTheme } from '../../context/ThemeContext';
 
 const { width } = Dimensions.get('window');
 

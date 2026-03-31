@@ -12,7 +12,7 @@ import {
     View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '../app/context/ThemeContext';
+import { useTheme } from '../context/ThemeContext';
 
 const { height } = Dimensions.get('window');
 

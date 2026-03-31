@@ -13,8 +13,8 @@ import {
   View,
 } from 'react-native';
 import { FONT, FONT_SIZE, RADIUS, SPACING } from '../../constants/globalStyles';
-import { useTheme } from '../context/ThemeContext';
-import { sendMessage as sendChatMessage } from '../services/chatbotService';
+import { useTheme } from '../../context/ThemeContext';
+import { sendMessage as sendChatMessage } from '../../services/chatbotService';
 
 type Message = {
   id: number;

@@ -1,6 +1,6 @@
 import { Stack } from 'expo-router';
-import { AuthProvider } from './context/AuthContext';
-import { ThemeProvider } from './context/ThemeContext';
+import { AuthProvider } from '../context/AuthContext';
+import { ThemeProvider } from '../context/ThemeContext';
 import { ToastProvider } from '../components/ToastContext';
 
 export default function RootLayout() {

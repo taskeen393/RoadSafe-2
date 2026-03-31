@@ -23,10 +23,10 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import MapView, { MapPressEvent, Marker } from "react-native-maps";
 import { useToast } from "../../components/ToastContext";
-import { useTheme } from "../context/ThemeContext";
+import { useTheme } from "../../context/ThemeContext";
 
-import { weatherService } from "../services";
-import { CitySearchResult, WeatherData } from "../services/types";
+import { weatherService } from "../../services";
+import { CitySearchResult, WeatherData } from "../../services/types";
 
 const { width } = Dimensions.get("window");
 
