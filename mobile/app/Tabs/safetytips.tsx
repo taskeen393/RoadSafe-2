@@ -99,6 +99,46 @@ const SECTIONS = [
       'سنسان علاقوں میں رات کو اکیلے سفر سے گریز کریں۔',
     ],
   },
+  {
+    key: 'flood',
+    icon: 'waves' as const,
+    color: '#0EA5E9',
+    title: { en: 'Flood Safety', ur: 'سیلاب سے بچاؤ' },
+    en: [
+      'Never attempt to drive through flowing water or flooded roads.',
+      'If your vehicle stalls in water, abandon it immediately and move to higher ground.',
+      'Be aware of flash floods in narrow valleys during monsoon.',
+      'Six inches of water can reach the bottom of most passenger cars.',
+      'Two feet of rushing water can carry away most vehicles.',
+    ],
+    ur: [
+      'بہتے ہوئے پانی یا سیلابی سڑکوں پر گاڑی چلانے کی کوشش کبھی نہ کریں۔',
+      'اگر گاڑی پانی میں پھنس جائے تو اسے فوری چھوڑ کر اونچی جگہ منتقل ہو جائیں۔',
+      'مون سون میں تنگ وادیوں میں اچانک سیلاب (فلیش فلڈ) سے ہوشیار رہیں۔',
+      'صرف چھ انچ پانی زیادہ تر گاڑیوں کے نچلے حصے تک پہنچ سکتا ہے۔',
+      'دو فٹ تیز بہتا ہوا پانی کسی بھی گاڑی کو بہا لے جا سکتا ہے۔',
+    ],
+  },
+  {
+    key: 'landslide',
+    icon: 'image-filter-hdr' as const,
+    color: '#D97706',
+    title: { en: 'Landslide Awareness', ur: 'لینڈ سلائیڈنگ کی آگاہی' },
+    en: [
+      'Watch for falling rocks, mud, or unusual debris on the road.',
+      'Avoid parking near steep slopes during or after heavy rain.',
+      'If you see a landslide starting, alert others and move away perpendicularly.',
+      'Listen for rumbling sounds that might indicate approaching debris.',
+      'Check FWO or NHMP updates for road clearance status.',
+    ],
+    ur: [
+      'سڑک پر گرتے ہوئے پتھروں، مٹی یا غیر معمولی ملبے پر نظر رکھیں۔',
+      'شدید بارش کے دوران یا بعد میں کھڑی ڈھلوانوں کے قریب گاڑی کھڑی نہ کریں۔',
+      'اگر لینڈ سلائیڈنگ شروع ہوتے دیکھیں تو دوسروں کو خبردار کریں اور دور ہو جائیں۔',
+      'گڑگڑاہٹ کی آوازوں پر کان دھریں جو ملبہ آنے کی علامت ہو سکتی ہیں۔',
+      'سڑک کھلنے کی تازہ ترین معلومات کے لیے FWO یا موٹروے پولیس سے رابطہ رکھیں۔',
+    ],
+  },
 ];
 
 const HEADER_TEXT = {

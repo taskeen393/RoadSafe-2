@@ -13,41 +13,15 @@ import {
   Ionicons,
   MaterialCommunityIcons,
 } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
+import { useAuth } from '../../context/AuthContext';
 
 export default function Layout() {
   const insets = useSafeAreaInsets();
-  const { showToast } = useToast();
   const { colors, isDark } = useTheme();
-  const [isAuthChecked, setIsAuthChecked] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const { user, loading: authLoading } = useAuth();
 
-  useFocusEffect(
-    useCallback(() => {
-      let isActive = true;
-      const checkAuth = async () => {
-        try {
-          const token = await SecureStore.getItemAsync('token');
-          if (isActive) {
-            setIsLoggedIn(!!token);
-            setIsAuthChecked(true);
-          }
-        } catch (err) {
-          console.log('Auth check error:', err);
-          if (isActive) {
-            showToast({ type: 'error', title: 'Auth Error', message: 'Failed to verify login. Please try again.' });
-            setIsLoggedIn(false);
-            setIsAuthChecked(true);
-          }
-        }
-      };
-      checkAuth();
-      return () => { isActive = false; };
-    }, [])
-  );
-
-  if (!isAuthChecked) return null;
-  if (!isLoggedIn) return null;
+  if (authLoading) return null;
+  if (!user) return null;
 
   return (
     <ReportProvider>

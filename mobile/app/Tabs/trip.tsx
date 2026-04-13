@@ -18,10 +18,13 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import MapView, { Marker, Polyline } from "react-native-maps";
+import MapView, { Marker, Polyline, Heatmap } from "react-native-maps";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useToast } from "../../components/ToastContext";
 import { useTheme } from '../../context/ThemeContext';
+import { useDisasterData } from '../hooks/useDisasterData';
+import DisasterMapLayers from '../../components/DisasterMapLayers';
+import MapLegend from '../../components/MapLegend';
 
 interface Review {
   id: string;
@@ -52,6 +55,7 @@ export default function TripScreen() {
   const [activeIndex, setActiveIndex] = useState(0);
   const [activeIsVideo, setActiveIsVideo] = useState(false);
   const locationWatcher = useRef<any>(null);
+  const { disasters, landslideHistory } = useDisasterData();
 
   const getDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
     const R = 6371e3;
@@ -155,13 +159,23 @@ export default function TripScreen() {
               ios: { shadowColor: isDark ? '#000' : G.darkGreen, shadowOffset: { width: 0, height: 4 }, shadowOpacity: isDark ? 0.3 : 0.15, shadowRadius: 12 },
               android: { elevation: 5 },
             })]}>
-              <MapView
-                style={styles.map}
-                initialRegion={{ latitude: location?.latitude || 24.8607, longitude: location?.longitude || 67.0011, latitudeDelta: 0.05, longitudeDelta: 0.05 }}
-              >
-                {location && <Marker coordinate={{ latitude: location.latitude, longitude: location.longitude }} />}
-                {route.length > 0 && <Polyline coordinates={route} strokeColor={G.darkGreen} strokeWidth={4} />}
-              </MapView>
+              <View style={styles.mapWrapInner}>
+                <MapView
+                  style={styles.map}
+                  showsTraffic={true}
+                  initialRegion={{ latitude: location?.latitude || 24.8607, longitude: location?.longitude || 67.0011, latitudeDelta: 0.05, longitudeDelta: 0.05 }}
+                >
+                  {location && <Marker coordinate={{ latitude: location.latitude, longitude: location.longitude }} />}
+                  {route.length > 0 && <Polyline coordinates={route} strokeColor={G.darkGreen} strokeWidth={4} />}
+
+                  {/* Shared Disaster & Landslide Layers */}
+                  <DisasterMapLayers
+                    disasters={disasters}
+                    landslideHistory={landslideHistory}
+                    showLandslideHistory={true}
+                  />
+                </MapView>
+              </View>
               {tracking && (
                 <View style={[styles.liveTag, { backgroundColor: G.red }]}>
                   <View style={styles.liveDot} />
@@ -292,6 +306,7 @@ export default function TripScreen() {
                   {r.route.length > 1 && (
                     <MapView
                       style={styles.smallMap}
+                      showsTraffic={true}
                       initialRegion={{ latitude: midPt.latitude, longitude: midPt.longitude, latitudeDelta: 0.05, longitudeDelta: 0.05 }}
                       scrollEnabled={false} zoomEnabled={false} pointerEvents="none"
                     >
@@ -331,12 +346,22 @@ export default function TripScreen() {
       {selectedReview && (
         <Modal visible={modalVisible} animationType="slide" onRequestClose={() => setModalVisible(false)}>
           <View style={{ flex: 1 }}>
-            <MapView
-              style={{ flex: 1 }}
-              initialRegion={{ latitude: selectedReview.route[0].latitude, longitude: selectedReview.route[0].longitude, latitudeDelta: 0.05, longitudeDelta: 0.05 }}
-            >
-              <Polyline coordinates={selectedReview.route} strokeColor={G.darkGreen} strokeWidth={4} />
-            </MapView>
+            <View style={{ flex: 1 }}>
+              <MapView
+                style={{ flex: 1 }}
+                showsTraffic={true}
+                initialRegion={{ latitude: selectedReview.route[0].latitude, longitude: selectedReview.route[0].longitude, latitudeDelta: 0.05, longitudeDelta: 0.05 }}
+              >
+                <Polyline coordinates={selectedReview.route} strokeColor={G.darkGreen} strokeWidth={4} />
+
+                {/* Shared Disaster & Landslide Layers */}
+                <DisasterMapLayers
+                  disasters={disasters}
+                  landslideHistory={landslideHistory}
+                  showLandslideHistory={true}
+                />
+              </MapView>
+            </View>
             <TouchableOpacity style={[styles.closeMapBtn, { backgroundColor: G.darkGreen }]} onPress={() => setModalVisible(false)}>
               <Ionicons name="close" size={18} color="#fff" />
               <Text style={styles.closeMapText}>Close Map</Text>
@@ -446,4 +471,5 @@ const styles = StyleSheet.create({
   closeMapBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, position: 'absolute', bottom: 40, alignSelf: 'center', paddingVertical: 12, paddingHorizontal: 28, borderRadius: 24 },
   closeMapText: { color: '#fff', fontWeight: '700', fontSize: 15 },
   mediaClose: { position: 'absolute', top: 50, right: 20, zIndex: 10, backgroundColor: 'rgba(255,255,255,0.15)', padding: 8, borderRadius: 20 },
+  mapWrapInner: { flex: 1, borderRadius: 20, overflow: 'hidden' },
 });

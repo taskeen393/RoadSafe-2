@@ -14,6 +14,8 @@ export * as chatbotService from './chatbotService';
 export * as sosService from './sosService';
 export * as weatherService from './weatherService';
 export * as userService from './userService';
+export * as disasterService from './disasterService';
+export { landslideService } from './landslideService';
 
 // Types
 export * from './types';

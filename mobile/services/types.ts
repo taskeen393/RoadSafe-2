@@ -36,6 +36,7 @@ export interface ReportRequest {
     description: string;
     imageUris: string[];
     videoUris: string[];
+    voiceUri?: string; // local file URI for upload
     dateTime: string;
 }
 
@@ -51,6 +52,7 @@ export interface ReportResponse {
     description: string;
     imageUris: string[];
     videoUris: string[];
+    voiceUri?: string; // Cloudinary URL
     createdAt: string;
 }
 
@@ -94,8 +96,10 @@ export interface WeatherData {
     main: {
         temp: number;
         humidity: number;
+        pressure: number;
     };
     weather: Array<{
+        main: string;
         description: string;
         icon: string;
     }>;
@@ -121,4 +125,28 @@ export interface CitySearchResult {
     display_name: string;
     lat: string;
     lon: string;
+}
+
+// ============ DISASTER TYPES ============
+export interface DisasterAlert {
+    id: string;
+    type: string;
+    title: string;
+    description: string;
+    severity: 'Green' | 'Yellow' | 'Orange' | 'Red';
+    location: string;
+    lat: number;
+    lon: number;
+    dateTime: string;
+    url?: string;
+}
+
+export interface LandslideEvent {
+    id: string;
+    lat: number;
+    lon: number;
+    date: string;
+    severity: 'Low' | 'Medium' | 'High';
+    cause: string;
+    location: string;
 }

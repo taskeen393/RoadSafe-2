@@ -12,10 +12,18 @@ import * as SecureStore from 'expo-secure-store';
 import apiClient, { API_BASE_URL } from './apiClient';
 import { ReportRequest, ReportResponse } from './types';
 
-function guessMimeTypeFromUri(uri: string, isVideo: boolean = false): string {
+function guessMimeTypeFromUri(uri: string, type: 'image' | 'video' | 'audio' = 'image'): string {
     const lower = uri.toLowerCase();
 
-    if (isVideo) {
+    if (type === 'audio') {
+        if (lower.endsWith('.m4a')) return 'audio/x-m4a';
+        if (lower.endsWith('.mp3')) return 'audio/mpeg';
+        if (lower.endsWith('.wav')) return 'audio/wav';
+        if (lower.endsWith('.caf')) return 'audio/x-caf';
+        return 'audio/mpeg';
+    }
+
+    if (type === 'video') {
         if (lower.endsWith('.mp4')) return 'video/mp4';
         if (lower.endsWith('.mov')) return 'video/quicktime';
         if (lower.endsWith('.avi')) return 'video/x-msvideo';
@@ -55,7 +63,7 @@ export const submitReport = async (data: ReportRequest): Promise<ReportResponse>
                 // Only send local file URIs (file:// or content://), not remote URLs
                 if (uri.startsWith('file://') || uri.startsWith('content://')) {
                     const filename = `report_image_${Date.now()}_${idx}.jpg`;
-                    const mimeType = guessMimeTypeFromUri(uri, false);
+                    const mimeType = guessMimeTypeFromUri(uri, 'image');
 
                     // React Native FormData format - fetch handles this better than axios
                     formData.append('images', {
@@ -74,7 +82,7 @@ export const submitReport = async (data: ReportRequest): Promise<ReportResponse>
                 // Only send local file URIs (file:// or content://), not remote URLs
                 if (uri.startsWith('file://') || uri.startsWith('content://')) {
                     const filename = `report_video_${Date.now()}_${idx}.mp4`;
-                    const mimeType = guessMimeTypeFromUri(uri, true);
+                    const mimeType = guessMimeTypeFromUri(uri, 'video');
 
                     // React Native FormData format for videos
                     formData.append('videos', {
@@ -97,9 +105,21 @@ export const submitReport = async (data: ReportRequest): Promise<ReportResponse>
             if (__DEV__) {
                 console.log(`✅ Added ${videoFilesAdded} video(s) to FormData`);
             }
-        } else {
+        }
+
+        // Send voice note as file
+        if (data.voiceUri && (data.voiceUri.startsWith('file://') || data.voiceUri.startsWith('content://'))) {
+            const filename = `report_voice_${Date.now()}.m4a`;
+            const mimeType = guessMimeTypeFromUri(data.voiceUri, 'audio');
+
+            formData.append('voice', {
+                uri: data.voiceUri,
+                type: mimeType,
+                name: filename,
+            } as any);
+
             if (__DEV__) {
-                console.log('ℹ️ No videos to upload');
+                console.log('🎤 Adding voice note to FormData:', { uri: data.voiceUri, filename });
             }
         }
 
@@ -108,6 +128,7 @@ export const submitReport = async (data: ReportRequest): Promise<ReportResponse>
                 title: data.title,
                 imageCount: data.imageUris?.length || 0,
                 videoCount: data.videoUris?.length || 0,
+                hasVoice: !!data.voiceUri,
                 imageUris: data.imageUris,
                 videoUris: data.videoUris,
                 location: data.location,

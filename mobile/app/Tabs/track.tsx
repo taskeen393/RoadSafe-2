@@ -9,9 +9,12 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
+import MapView, { Marker, Heatmap } from 'react-native-maps';
 import { useToast } from '../../components/ToastContext';
 import { useTheme } from '../../context/ThemeContext';
+import { useDisasterData } from '../hooks/useDisasterData';
+import DisasterMapLayers from '../../components/DisasterMapLayers';
+import MapLegend from '../../components/MapLegend';
 
 // Import SOS service
 import { sosService } from '../../services';
@@ -90,38 +93,51 @@ export default function TrackScreen() {
     }
   };
 
+  const { disasters, landslideHistory } = useDisasterData();
+
   return (
     <View style={[styles.container, { backgroundColor: G.bg }]}>
       {/* Map */}
-      <MapView
-        ref={mapRef}
-        style={styles.map}
-        initialRegion={{
-          latitude: location?.latitude || 24.8607,
-          longitude: location?.longitude || 67.0011,
-          latitudeDelta: 0.05,
-          longitudeDelta: 0.05,
-        }}
-        region={location ? {
-          latitude: location.latitude,
-          longitude: location.longitude,
-          latitudeDelta: 0.05,
-          longitudeDelta: 0.05,
-        } : undefined}
-      >
-        {location && (
-          <Marker coordinate={location} title="You are here" pinColor="#2D7A4D" />
-        )}
-        {places.map((place:any, i:any) => (
-          <Marker
-            key={i}
-            coordinate={{ latitude: place.lat, longitude: place.lon }}
-            title={place.name}
-            description={place.address}
-            pinColor={getTypeColor(activeType)}
+      <View style={{ flex: 1 }}>
+        <MapView
+          ref={mapRef}
+          style={styles.map}
+          showsTraffic={true}
+          initialRegion={{
+            latitude: location?.latitude || 24.8607,
+            longitude: location?.longitude || 67.0011,
+            latitudeDelta: 0.1,
+            longitudeDelta: 0.1,
+          }}
+          region={location ? {
+            latitude: location.latitude,
+            longitude: location.longitude,
+            latitudeDelta: 0.1,
+            longitudeDelta: 0.1,
+          } : undefined}
+        >
+          {location && (
+            <Marker coordinate={location} title="You are here" pinColor="#2D7A4D" />
+          )}
+
+          {/* Shared Disaster & Landslide Layers */}
+          <DisasterMapLayers
+            disasters={disasters}
+            landslideHistory={landslideHistory}
+            showLandslideHistory={true}
           />
-        ))}
-      </MapView>
+
+          {places.map((place: any, i: any) => (
+            <Marker
+              key={i}
+              coordinate={{ latitude: place.lat, longitude: place.lon }}
+              title={place.name}
+              description={place.address}
+              pinColor={getTypeColor(activeType)}
+            />
+          ))}
+        </MapView>
+      </View>
 
       {/* Bottom Panel */}
       <View style={[styles.panel, { backgroundColor: G.card, borderColor: G.border }]}>
@@ -152,7 +168,7 @@ export default function TrackScreen() {
               {loading ? 'Searching nearby...' : 'No places found nearby'}
             </Text>
           }
-          renderItem={({ item }:any) => (
+          renderItem={({ item }: any) => (
             <TouchableOpacity
               style={[styles.placeCard, { backgroundColor: G.inputBg, borderColor: G.border }]}
               onPress={() => openDirections(item.lat, item.lon)}

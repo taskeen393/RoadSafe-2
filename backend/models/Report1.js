@@ -10,6 +10,7 @@ const reportSchema = new mongoose.Schema({
   lon: { type: Number },                      // longitude
   imageUris: { type: [String], default: [] }, // images array
   videoUris: { type: [String], default: [] }, // videos array
+  voiceUri: { type: String, default: null }, // voice note URL
   createdAt: { type: Date, default: Date.now },
 });
 

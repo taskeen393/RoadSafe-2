@@ -2,7 +2,7 @@
  * Centralized API Client
  * 
  * Single axios instance with:
- * - Base URL configuration
+ * - Base URL configuration (auto-switches: Expo Go = local IP, APK = Railway)
  * - Auth token interceptor (auto-injects Bearer token)
  * - Error handling interceptor
  */
@@ -10,19 +10,21 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import * as SecureStore from 'expo-secure-store';
 
-// Base URL for backend API - Uses environment variable
-// For physical devices/emulators, use your computer's IP address instead of localhost
-// Example: 'http://192.168.1.100:5000/api'
-// To set: Create a .env file with EXPO_PUBLIC_API_URL=http://your-ip:5000/api
-export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5000/api';
+// ✅ Smart URL: Expo Go pe local IP, APK pe deployed backend
+// Expo Go mein __DEV__ = true aur EXPO_PUBLIC_API_URL set hota hai
+// APK mein EXPO_PUBLIC_API_URL environment se nahi milta (build time pe bake hota hai)
+const DEPLOYED_BACKEND_URL = 'https://amt-backend-production.up.railway.app/api';
+const LOCAL_BACKEND_URL = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.2.104:5000/api';
+
+// __DEV__ = true means running in Expo Go / dev mode
+// __DEV__ = false means running as standalone APK
+export const API_BASE_URL = __DEV__ ? LOCAL_BACKEND_URL : DEPLOYED_BACKEND_URL;
 
 // Log API base URL in development to help debug connection issues
 if (__DEV__) {
-    // console.log('🔗 API Base URL:', API_BASE_URL || '⚠️ NOT SET - API calls will fail!');
-    if (!process.env.EXPO_PUBLIC_API_URL) {
-        console.warn('⚠️ EXPO_PUBLIC_API_URL not set, using default:', API_BASE_URL);
-        console.warn('💡 For physical devices, set EXPO_PUBLIC_API_URL to your computer IP address');
-    }
+    console.log('🔗 API Base URL (Expo Go mode):', API_BASE_URL);
+} else {
+    console.log('📦 API Base URL (APK mode):', API_BASE_URL);
 }
 
 // External API keys
@@ -78,21 +80,15 @@ apiClient.interceptors.response.use(
     (response) => response,
     (error: AxiosError) => {
         if (__DEV__) {
-            // Network error (no response from server)
+            const status = error.response?.status;
+            // 400 errors (e.g. wrong password) — log nahi karo, user ko UI mein dikhao
             if (!error.response) {
-                // console.error('❌ Network Error:', {
-                //     url: error.config?.url,
-                //     fullUrl: error.config?.baseURL ? `${error.config.baseURL}${error.config.url || ''}` : 'unknown',
-                //     message: error.message,
-                //     code: error.code,
-                //     hint: 'Check if backend is running and API_BASE_URL is correct'
-                // });
-            } else {
-                // Server responded with error status
-                console.error('❌ API Error:', {
+                console.warn('⚠️ Network Error: Backend se connection nahi. Check karein server chal raha hai.');
+            } else if (status && status >= 500) {
+                // Sirf serious server errors log karo
+                console.error('❌ Server Error:', {
                     url: error.config?.url,
-                    status: error.response?.status,
-                    statusText: error.response?.statusText,
+                    status,
                     data: error.response?.data,
                 });
             }
@@ -100,16 +96,20 @@ apiClient.interceptors.response.use(
 
         // Handle specific error codes
         if (error.response?.status === 401) {
-            // Token expired or invalid - could trigger logout
-            console.log('Unauthorized - Token may be expired');
-            SecureStore.deleteItemAsync('token').then(() => {
-                try {
-                    const { router } = require('expo-router');
-                    router.replace('/auth/login');
-                } catch (e) {
-                    console.log('Navigation not ready:', e);
-                }
-            }).catch(e => console.log('Error deleting token:', e));
+            const msg = (error.response?.data as any)?.msg || 'Unauthorized';
+            console.log(`❌ 401 Unauthorized: ${msg}`);
+            
+            // Clear token and redirect to login
+            SecureStore.deleteItemAsync('token')
+                .catch(e => console.log('⚠️ SecureStore delete error:', e.message))
+                .finally(() => {
+                    try {
+                        const { router } = require('expo-router');
+                        if (router) router.replace('/auth/login');
+                    } catch (e) {
+                        console.log('🚪 Navigation to login failed');
+                    }
+                });
         }
 
         return Promise.reject(error);

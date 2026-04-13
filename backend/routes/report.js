@@ -54,10 +54,11 @@ router.post('/',
   },
   protect,
   (req, res, next) => {
-    // Use fields to handle both images and videos
+    // Use fields to handle images, videos, and voice
     uploadMixed.fields([
       { name: 'images', maxCount: 5 },
-      { name: 'videos', maxCount: 3 }
+      { name: 'videos', maxCount: 3 },
+      { name: 'voice', maxCount: 1 }
     ])(req, res, next);
   },
   handleMulterError, 
@@ -69,7 +70,8 @@ router.put('/:id',
   (req, res, next) => {
     uploadMixed.fields([
       { name: 'images', maxCount: 5 },
-      { name: 'videos', maxCount: 3 }
+      { name: 'videos', maxCount: 3 },
+      { name: 'voice', maxCount: 1 }
     ])(req, res, next);
   },
   handleMulterError, 

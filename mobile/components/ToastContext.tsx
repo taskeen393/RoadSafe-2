@@ -23,7 +23,7 @@ export interface ToastConfig {
     type: ToastType;
     title: string;
     message?: string;
-    duration?: number; // ms, default 3000
+    duration?: number; // ms, default 6000
 }
 
 interface ToastContextValue {
@@ -76,7 +76,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     const showToast = useCallback((config: ToastConfig) => {
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
 
-        const duration = config.duration || 3000;
+        const duration = config.duration || 6000;
 
         setToast(config);
         setVisible(true);

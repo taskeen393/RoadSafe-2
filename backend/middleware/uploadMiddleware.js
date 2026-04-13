@@ -43,11 +43,15 @@ export const uploadMixed = multer({
     files: 8, // Total files (5 images + 3 videos)
   },
   fileFilter: (_req, file, cb) => {
-    // Allow both images and videos
-    if (file.mimetype?.startsWith('image/') || file.mimetype?.startsWith('video/')) {
+    // Allow images, videos, and audio
+    if (
+      file.mimetype?.startsWith('image/') ||
+      file.mimetype?.startsWith('video/') ||
+      file.mimetype?.startsWith('audio/')
+    ) {
       return cb(null, true);
     }
-    cb(new Error('Only image and video uploads are allowed'));
+    cb(new Error('Only image, video, and audio uploads are allowed'));
   },
 });
 

@@ -35,6 +35,7 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
 
   const scrollToInput = (y: number) => {
     setTimeout(() => {
@@ -47,6 +48,7 @@ export default function Login() {
       showToast({ type: 'warning', title: 'Missing Fields', message: 'Please fill all fields' });
       return;
     }
+    setPasswordError('');
     setLoading(true);
     try {
       const response = await authService.login({ email, password });
@@ -59,7 +61,19 @@ export default function Login() {
       await loginContext(response.token, user);
       router.replace('/Tabs');
     } catch (error: any) {
-      showToast({ type: 'error', title: 'Login Failed', message: error?.msg || error?.message || 'Invalid credentials' });
+      // AxiosError: actual message is inside error.response.data
+      const data = error?.response?.data;
+      const msg = data?.message || data?.msg || error?.message || '';
+      const isPasswordError =
+        msg.toLowerCase().includes('password') ||
+        msg.toLowerCase().includes('invalid') ||
+        msg.toLowerCase().includes('incorrect') ||
+        msg.toLowerCase().includes('credentials');
+      if (isPasswordError) {
+        setPasswordError('Password incorrect hai. Dobara try karein.');
+      } else {
+        showToast({ type: 'error', title: 'Login Failed', message: msg || 'Something went wrong' });
+      }
     } finally {
       setLoading(false);
     }
@@ -141,7 +155,10 @@ export default function Login() {
                 <TextInput
                   style={[styles.textInput, { color: G.text }]}
                   value={password}
-                  onChangeText={setPassword}
+                  onChangeText={(text) => {
+                    setPassword(text);
+                    if (passwordError) setPasswordError('');
+                  }}
                   placeholder="Enter your password"
                   placeholderTextColor={G.sub}
                   secureTextEntry={!showPassword}
@@ -160,6 +177,9 @@ export default function Login() {
                   />
                 </TouchableOpacity>
               </View>
+              {passwordError ? (
+                <Text style={styles.errorText}>{passwordError}</Text>
+              ) : null}
             </View>
 
             {/* Login Button */}
@@ -268,4 +288,7 @@ const styles = StyleSheet.create({
 
   // Footer
   footer: { textAlign: 'center', fontSize: 11, marginTop: 24, marginBottom: 30, paddingHorizontal: 40, lineHeight: 16 },
+
+  // Error
+  errorText: { color: '#EF4444', fontSize: 12, fontWeight: '600', marginTop: 6, marginLeft: 4 },
 });

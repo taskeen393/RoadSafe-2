@@ -9,12 +9,12 @@ import { initCloudinary } from '../config/cloudinary.js';
  */
 function extractPublicIdFromUrl(url, resourceType = 'image') {
   try {
-    // Match the pattern to extract everything after /upload/v{version}/
+    // Match the pattern to extract everything after /upload/v\d+\/(.+)$/
     // This includes folder path and filename
     const match = url.match(/\/upload\/v\d+\/(.+)$/);
     if (match && match[1]) {
       // Remove file extension but keep folder path
-      const publicId = match[1].replace(/\.(jpg|jpeg|png|gif|webp|mp4|mov|avi|mkv|webm)$/i, '');
+      const publicId = match[1].replace(/\.(jpg|jpeg|png|gif|webp|mp4|mov|avi|mkv|webm|m4a|mp3|wav|aac|ogg)$/i, '');
       return publicId;
     }
     return null;
@@ -169,14 +169,17 @@ export const getReports = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
 export const addReport = async (req, res) => {
   try {
     const uploadedImageUrls = [];
     const uploadedVideoUrls = [];
+    let uploadedVoiceUrl = null;
 
     // Handle files from multer - can be array or fields object
     let imageFiles = [];
     let videoFiles = [];
+    let voiceFiles = [];
 
     console.log('📥 Received files:', {
       hasFiles: !!req.files,
@@ -190,14 +193,17 @@ export const addReport = async (req, res) => {
         // Single field upload (backwards compatibility)
         imageFiles = req.files.filter(f => f.mimetype?.startsWith('image/'));
         videoFiles = req.files.filter(f => f.mimetype?.startsWith('video/'));
-        console.log('📁 Array format - Images:', imageFiles.length, 'Videos:', videoFiles.length);
-      } else if (req.files.images || req.files.videos) {
+        voiceFiles = req.files.filter(f => f.mimetype?.startsWith('audio/'));
+        console.log('📁 Array format - Images:', imageFiles.length, 'Videos:', videoFiles.length, 'Voice:', voiceFiles.length);
+      } else {
         // Fields upload (new format)
         imageFiles = req.files.images || [];
         videoFiles = req.files.videos || [];
-        console.log('📁 Fields format - Images:', imageFiles.length, 'Videos:', videoFiles.length);
-        if (videoFiles.length > 0) {
-          console.log('🎥 Video files details:', videoFiles.map(f => ({
+        voiceFiles = req.files.voice || [];
+        console.log('📁 Fields format - Images:', imageFiles.length, 'Videos:', videoFiles.length, 'Voice:', voiceFiles.length);
+        
+        if (voiceFiles.length > 0) {
+          console.log('🎤 Voice files details:', voiceFiles.map(f => ({
             fieldname: f.fieldname,
             originalname: f.originalname,
             mimetype: f.mimetype,
@@ -209,7 +215,7 @@ export const addReport = async (req, res) => {
 
     const cloudinaryConfig = initCloudinary();
 
-    if ((imageFiles.length > 0 || videoFiles.length > 0) && !cloudinaryConfig) {
+    if ((imageFiles.length > 0 || videoFiles.length > 0 || voiceFiles.length > 0) && !cloudinaryConfig) {
       return res.status(400).json({
         message: 'Media upload requires Cloudinary configuration. Please configure CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET in backend/.env'
       });
@@ -287,9 +293,36 @@ export const addReport = async (req, res) => {
           });
         }
       }
-      console.log(`✅ All ${uploadedVideoUrls.length} video(s) uploaded successfully`);
-    } else if (videoFiles.length > 0) {
-      console.warn('⚠️ Videos provided but Cloudinary not configured');
+    }
+
+    // Upload voice notes to Cloudinary
+    if (voiceFiles.length > 0 && cloudinaryConfig) {
+      console.log(`🎤 Starting upload of voice note to Cloudinary`);
+      const { cloudinary, folder } = cloudinaryConfig;
+      const file = voiceFiles[0]; // Only handle one voice note
+
+      try {
+        const result = await new Promise((resolve, reject) => {
+          const stream = cloudinary.uploader.upload_stream(
+            {
+              folder: `${folder}/voice`,
+              resource_type: 'video', // Cloudinary uses 'video' for audio
+            },
+            (err, uploadResult) => {
+              if (err) return reject(err);
+              return resolve(uploadResult);
+            }
+          );
+          stream.end(file.buffer);
+        });
+
+        if (result?.secure_url) {
+          uploadedVoiceUrl = result.secure_url;
+          console.log(`✅ Voice note uploaded successfully:`, uploadedVoiceUrl);
+        }
+      } catch (uploadError) {
+        console.error(`❌ Cloudinary voice upload error:`, uploadError);
+      }
     }
 
     // Backwards compatible: if client still sends imageUris/videoUris in body, accept them if no files uploaded
@@ -303,6 +336,7 @@ export const addReport = async (req, res) => {
       imageCount: finalImageUris.length,
       videoCount: finalVideoUris.length,
       videoUris: finalVideoUris,
+      hasVoice: !!uploadedVoiceUrl
     });
 
     const report = await Report.create({
@@ -315,12 +349,14 @@ export const addReport = async (req, res) => {
       lon: toNumber(req.body.lon),
       imageUris: finalImageUris,
       videoUris: finalVideoUris,
+      voiceUri: uploadedVoiceUrl || req.body.voiceUri || null,
     });
 
     console.log('✅ Report created:', {
       id: report._id,
       imageCount: report.imageUris?.length || 0,
       videoCount: report.videoUris?.length || 0,
+      hasVoice: !!report.voiceUri
     });
 
     res.status(201).json(report);
@@ -346,26 +382,30 @@ export const updateReport = async (req, res) => {
 
     const uploadedImageUrls = [];
     const uploadedVideoUrls = [];
+    let uploadedVoiceUrl = null;
 
     // Handle files from multer - can be array or fields object
     let imageFiles = [];
     let videoFiles = [];
+    let voiceFiles = [];
 
     if (req.files) {
       if (Array.isArray(req.files)) {
         // Single field upload (backwards compatibility)
         imageFiles = req.files.filter(f => f.mimetype?.startsWith('image/'));
         videoFiles = req.files.filter(f => f.mimetype?.startsWith('video/'));
-      } else if (req.files.images || req.files.videos) {
+        voiceFiles = req.files.filter(f => f.mimetype?.startsWith('audio/'));
+      } else {
         // Fields upload (new format)
         imageFiles = req.files.images || [];
         videoFiles = req.files.videos || [];
+        voiceFiles = req.files.voice || [];
       }
     }
 
     const cloudinaryConfig = initCloudinary();
 
-    if ((imageFiles.length > 0 || videoFiles.length > 0) && !cloudinaryConfig) {
+    if ((imageFiles.length > 0 || videoFiles.length > 0 || voiceFiles.length > 0) && !cloudinaryConfig) {
       return res.status(400).json({
         message: 'Media upload requires Cloudinary configuration. Please configure CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET in backend/.env'
       });
@@ -412,7 +452,7 @@ export const updateReport = async (req, res) => {
               {
                 folder: `${folder}/videos`,
                 resource_type: 'video',
-                chunk_size: 6000000, // 6MB chunks for large videos
+                chunk_size: 6000000,
               },
               (err, uploadResult) => {
                 if (err) return reject(err);
@@ -425,10 +465,31 @@ export const updateReport = async (req, res) => {
           if (result?.secure_url) uploadedVideoUrls.push(result.secure_url);
         } catch (uploadError) {
           console.error('Cloudinary video upload error:', uploadError);
-          return res.status(500).json({
-            message: 'Failed to upload video to Cloudinary. Please check your Cloudinary configuration.'
-          });
         }
+      }
+    }
+
+    // Upload new voice note (if provided) to Cloudinary
+    if (voiceFiles.length > 0 && cloudinaryConfig) {
+      const { cloudinary, folder } = cloudinaryConfig;
+      const file = voiceFiles[0];
+      try {
+        const result = await new Promise((resolve, reject) => {
+          const stream = cloudinary.uploader.upload_stream(
+            {
+              folder: `${folder}/voice`,
+              resource_type: 'video',
+            },
+            (err, uploadResult) => {
+              if (err) return reject(err);
+              return resolve(uploadResult);
+            }
+          );
+          stream.end(file.buffer);
+        });
+        if (result?.secure_url) uploadedVoiceUrl = result.secure_url;
+      } catch (uploadError) {
+        console.error('Cloudinary voice upload error:', uploadError);
       }
     }
 
@@ -448,21 +509,17 @@ export const updateReport = async (req, res) => {
     if (req.body.lon !== undefined) updateData.lon = toNumber(req.body.lon);
 
     if (uploadedImageUrls.length > 0) {
-      // Replace existing images with new ones
       newImageUris = uploadedImageUrls;
       updateData.imageUris = uploadedImageUrls;
     } else if (req.body.imageUris !== undefined) {
-      // Allow updating imageUris from body if no new files uploaded
       newImageUris = parseMaybeJsonArray(req.body.imageUris);
       updateData.imageUris = newImageUris;
     }
 
     if (uploadedVideoUrls.length > 0) {
-      // Replace existing videos with new ones
       newVideoUris = uploadedVideoUrls;
       updateData.videoUris = uploadedVideoUrls;
     } else if (req.body.videoUris !== undefined) {
-      // Allow updating videoUris from body if no new files uploaded
       newVideoUris = parseMaybeJsonArray(req.body.videoUris);
       updateData.videoUris = newVideoUris;
     }
@@ -471,7 +528,6 @@ export const updateReport = async (req, res) => {
     if (uploadedImageUrls.length > 0 || req.body.imageUris !== undefined) {
       const imagesToDelete = oldImageUris.filter(url => !newImageUris.includes(url));
       if (imagesToDelete.length > 0) {
-        console.log(`🗑️ Deleting ${imagesToDelete.length} old image(s) from Cloudinary`);
         await deleteFromCloudinary(imagesToDelete, 'image');
       }
     }
@@ -480,8 +536,20 @@ export const updateReport = async (req, res) => {
     if (uploadedVideoUrls.length > 0 || req.body.videoUris !== undefined) {
       const videosToDelete = oldVideoUris.filter(url => !newVideoUris.includes(url));
       if (videosToDelete.length > 0) {
-        console.log(`🗑️ Deleting ${videosToDelete.length} old video(s) from Cloudinary`);
         await deleteFromCloudinary(videosToDelete, 'video');
+      }
+    }
+
+    // Handle voiceUri update and deletion
+    if (uploadedVoiceUrl) {
+      updateData.voiceUri = uploadedVoiceUrl;
+      if (report.voiceUri) {
+        await deleteFromCloudinary([report.voiceUri], 'video');
+      }
+    } else if (req.body.voiceUri === null || req.body.voiceUri === '') {
+      updateData.voiceUri = null;
+      if (report.voiceUri) {
+        await deleteFromCloudinary([report.voiceUri], 'video');
       }
     }
 
@@ -491,7 +559,6 @@ export const updateReport = async (req, res) => {
       { new: true, runValidators: true }
     );
 
-    console.log(`✅ Report ${req.params.id} updated successfully`);
     res.status(200).json(updatedReport);
   } catch (error) {
     console.error("Update report error:", error.message);
@@ -513,31 +580,28 @@ export const deleteReport = async (req, res) => {
       return res.status(403).json({ message: 'Not authorized to delete this report' });
     }
 
-    // Delete images and videos from Cloudinary before deleting the report
     const imageUris = Array.isArray(report.imageUris) ? report.imageUris : [];
     const videoUris = Array.isArray(report.videoUris) ? report.videoUris : [];
 
-    console.log(`🗑️ Deleting report ${req.params.id} with ${imageUris.length} image(s) and ${videoUris.length} video(s)`);
+    console.log(`🗑️ Deleting report ${req.params.id}`);
 
-    // Delete images from Cloudinary
     if (imageUris.length > 0) {
       await deleteFromCloudinary(imageUris, 'image');
     }
 
-    // Delete videos from Cloudinary
     if (videoUris.length > 0) {
       await deleteFromCloudinary(videoUris, 'video');
     }
 
-    // Delete the report from database
+    if (report.voiceUri) {
+      await deleteFromCloudinary([report.voiceUri], 'video');
+    }
+
     await Report.findByIdAndDelete(req.params.id);
 
-    console.log(`✅ Report ${req.params.id} deleted successfully`);
     res.status(200).json({ message: 'Report deleted successfully' });
   } catch (error) {
     console.error("Delete report error:", error.message);
     res.status(500).json({ message: error.message });
   }
 };
-
-

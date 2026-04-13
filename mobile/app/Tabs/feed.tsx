@@ -1,7 +1,7 @@
 // app/Tabs/feed.tsx — Community Feed (Light + Dark Theme)
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ResizeMode, Video } from 'expo-av';
+import { ResizeMode, Video, Audio } from 'expo-av';
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
@@ -39,6 +39,7 @@ interface ReportItem {
   text: string;
   imageUris: string[];
   videoUris: string[];
+  voiceUri?: string;
   dateTime: string;
   title?: string;
 }
@@ -58,6 +59,72 @@ export default function FeedScreen() {
   const isLoadingRef = useRef(false);
 
   const PAGE_SIZE = 10;
+
+  // ── Voice Player Component for Feed ──
+  function FeedVoicePlayer({ uri }: { uri: string }) {
+    const { colors: G, isDark } = useTheme();
+    const [sound, setSound] = useState<Audio.Sound | null>(null);
+    const [isPlaying, setIsPlaying] = useState(false);
+    const [duration, setDuration] = useState(0);
+    const [position, setPosition] = useState(0);
+
+    const togglePlayback = async () => {
+      try {
+        if (sound) {
+          if (isPlaying) {
+            await sound.pauseAsync();
+          } else {
+            await sound.playAsync();
+          }
+        } else {
+          const { sound: newSound } = await Audio.Sound.createAsync(
+            { uri },
+            { shouldPlay: true, isLooping: false }
+          );
+          setSound(newSound);
+          newSound.setOnPlaybackStatusUpdate(async (status: any) => {
+            if (status.isLoaded) {
+              setIsPlaying(status.isPlaying);
+              if (status.didJustFinish) {
+                setIsPlaying(false);
+                await newSound.unloadAsync();
+                setSound(null);
+              }
+              setDuration(status.durationMillis || 0);
+              setPosition(status.positionMillis || 0);
+            }
+          });
+        }
+      } catch (error) {
+        console.error('FeedVoicePlayer error:', error);
+      }
+    };
+
+    React.useEffect(() => {
+      return () => {
+        if (sound) {
+          sound.unloadAsync();
+        }
+      };
+    }, [sound]);
+
+    const progress = duration > 0 ? (position / duration) * 100 : 0;
+
+    return (
+      <View style={[styles.feedVoicePlayer, { backgroundColor: isDark ? '#1F2937' : '#F9FAFB', borderColor: G.border }]}>
+        <TouchableOpacity onPress={togglePlayback} style={[styles.feedPlayBtn, { backgroundColor: G.midGreen }]}>
+          <Ionicons name={isPlaying ? "pause" : "play"} size={18} color="#fff" />
+        </TouchableOpacity>
+
+        <View style={styles.audioMeta}>
+          <Text style={[styles.audioLabel, { color: G.text }]}>Voice Update</Text>
+          <View style={styles.progressBarBg}>
+            <View style={[styles.progressBarFill, { width: `${progress}%`, backgroundColor: G.midGreen }]} />
+          </View>
+        </View>
+      </View>
+    );
+  }
 
   // ── Filtered reports based on search ───────────────
   const filteredReports = useMemo(() => {
@@ -106,40 +173,39 @@ export default function FeedScreen() {
       title: r.title ? String(r.title) : undefined,
       imageUris: Array.isArray(r.imageUris) ? r.imageUris : [],
       videoUris: Array.isArray(r.videoUris) ? r.videoUris : [],
+      voiceUri: r.voiceUri ? String(r.voiceUri) : undefined,
       dateTime: String(r.createdAt ?? new Date().toISOString()),
     }));
 
   /* ----- Initial fetch (page 1) ----- */
-  useFocusEffect(
-    useCallback(() => {
-      let isMounted = true;
-      const fetchInitial = async () => {
-        if (isLoadingRef.current) return;
-        isLoadingRef.current = true;
-        setLoading(true);
-        try {
-          const user = await getCurrentUser();
-          if (user && isMounted) {
-            setCurrentUserId((user._id || (user as any).id) ? String(user._id || (user as any).id) : null);
-            setCurrentUserName(user.name ? String(user.name) : null);
-          }
-          const res = await reportService.getReportsPaginated(1, PAGE_SIZE);
-          if (!isMounted) return;
-          setReports(mapReportData(res.reports));
-          setPage(1);
-          setHasMore(res.hasMore);
-          setTotalReports(res.total);
-        } catch (err) {
-          // silent
-        } finally {
-          setLoading(false);
-          isLoadingRef.current = false;
+  React.useEffect(() => {
+    let isMounted = true;
+    const fetchInitial = async () => {
+      if (isLoadingRef.current) return;
+      isLoadingRef.current = true;
+      setLoading(true);
+      try {
+        const user = await getCurrentUser();
+        if (user && isMounted) {
+          setCurrentUserId((user._id || (user as any).id) ? String(user._id || (user as any).id) : null);
+          setCurrentUserName(user.name ? String(user.name) : null);
         }
-      };
-      fetchInitial();
-      return () => { isMounted = false; };
-    }, [])
-  );
+        const res = await reportService.getReportsPaginated(1, PAGE_SIZE);
+        if (!isMounted) return;
+        setReports(mapReportData(res.reports));
+        setPage(1);
+        setHasMore(res.hasMore);
+        setTotalReports(res.total);
+      } catch (err) {
+        // silent
+      } finally {
+        setLoading(false);
+        isLoadingRef.current = false;
+      }
+    };
+    fetchInitial();
+    return () => { isMounted = false; };
+  }, []);
 
   /* ----- Load more (next page) ----- */
   const loadMore = useCallback(async () => {
@@ -393,6 +459,7 @@ export default function FeedScreen() {
                 {!!item.text && item.text !== 'No description' && (
                   <Text style={[styles.cardText, { color: isDark ? G.sub : '#4B5563' }]} numberOfLines={hasMedia ? 3 : 8}>{item.text}</Text>
                 )}
+                {!!item.voiceUri && <FeedVoicePlayer uri={item.voiceUri} />}
               </View>
 
               {/* ─── Media Section ─── */}
@@ -686,4 +753,42 @@ const styles = StyleSheet.create({
   // Loading more
   loadingMore: { alignItems: 'center', paddingVertical: 20, gap: 8, flexDirection: 'row', justifyContent: 'center' },
   loadingMoreText: { fontSize: 13, fontWeight: '500' },
+
+  // Feed Voice Player
+  feedVoicePlayer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  feedPlayBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  audioMeta: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  audioLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    marginBottom: 4,
+    opacity: 0.7,
+  },
+  progressBarBg: {
+    height: 3,
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    borderRadius: 1.5,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 1.5,
+  },
 });

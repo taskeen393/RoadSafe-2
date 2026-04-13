@@ -1,10 +1,12 @@
-import { AntDesign, FontAwesome, Ionicons } from '@expo/vector-icons';
+import { AntDesign, FontAwesome, FontAwesome5, Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
 import * as SecureStore from 'expo-secure-store';
-import React, { useEffect, useState } from 'react';
+import { Audio } from 'expo-av';
+import React, { useEffect, useState, useRef } from 'react';
 import {
+  ActivityIndicator,
   FlatList,
   Image,
   Modal,
@@ -16,13 +18,17 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
+import MapView, { Marker, Heatmap } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { reportService } from '../../services';
 import { ReportRequest } from '../../services/types';
 import { useToast } from '../../components/ToastContext';
 import ActionSheet from '../../components/ActionSheet';
 import { useTheme } from '../../context/ThemeContext';
+import { useDisasterData } from '../hooks/useDisasterData';
+import DisasterMapLayers from '../../components/DisasterMapLayers';
+import MapLegend from '../../components/MapLegend';
+// import { transcribeAudio } from '../../services/transcribeService'; // Removed STT
 
 
 export default function ReportScreen({ navigation }: any) {
@@ -43,6 +49,16 @@ export default function ReportScreen({ navigation }: any) {
   const [imageSheetVisible, setImageSheetVisible] = useState(false);
   const [videoSheetVisible, setVideoSheetVisible] = useState(false);
   const { showToast } = useToast();
+  const { disasters, landslideHistory } = useDisasterData();
+
+  // Voice States
+  const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const [isRecordingVoice, setIsRecordingVoice] = useState(false);
+  const [voiceUri, setVoiceUri] = useState<string | null>(null);
+  const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const recordingTimer = useRef<any>(null);
+  const [recordTime, setRecordTime] = useState(0);
 
   // Incident type selection
   const incidentTypes = [
@@ -63,8 +79,19 @@ export default function ReportScreen({ navigation }: any) {
         if (userStr) setUser(JSON.parse(userStr).name);
       }
     };
-    checkAuth();
     getLocation();
+
+    return () => {
+      if (sound) {
+        sound.unloadAsync();
+      }
+      if (recording) {
+        recording.stopAndUnloadAsync();
+      }
+      if (recordingTimer.current) {
+        clearInterval(recordingTimer.current);
+      }
+    };
   }, []);
 
   const getLocation = async () => {
@@ -108,29 +135,114 @@ export default function ReportScreen({ navigation }: any) {
     if (!r.canceled) setSelectedVideos(p => [...p, ...r.assets.map(a => a.uri)]);
   };
 
-  const submitReport = async () => {
-    if (!titleInput.trim()) {
-      return showToast({ type: 'warning', title: 'Missing Title', message: 'Please add a title for your report' });
+  // ── Voice Handlers ──
+  async function startRecording() {
+    try {
+      const { status } = await Audio.requestPermissionsAsync();
+      if (status !== 'granted') return showToast({ type: 'error', title: 'Permission', message: 'Mic permission required' });
+
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+      const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+      setRecording(recording);
+      setIsRecordingVoice(true);
+
+      setRecordTime(0);
+      recordingTimer.current = setInterval(() => setRecordTime(p => p + 1), 1000);
+    } catch (err) {
+      console.error('Failed to start recording', err);
     }
-    if (!textInput.trim() && selectedImages.length === 0 && selectedVideos.length === 0) {
-      return showToast({ type: 'warning', title: 'Add Content', message: 'Please add text, image or video before submitting' });
+  }
+
+  async function stopRecording() {
+    if (!recording) return;
+    try {
+      if (recordingTimer.current) clearInterval(recordingTimer.current);
+      await recording.stopAndUnloadAsync();
+      const uri = recording.getURI();
+      setRecording(null);
+      setIsRecordingVoice(false);
+
+      if (uri) {
+        setVoiceUri(uri);
+      }
+    } catch (err) {
+      console.error('Failed to stop recording', err);
+    }
+  }
+
+  const playVoiceNote = async () => {
+    if (!voiceUri) return;
+    try {
+      if (sound) {
+        if (isPlaying) {
+          await sound.pauseAsync();
+          setIsPlaying(false);
+        } else {
+          await sound.playAsync();
+          setIsPlaying(true);
+        }
+      } else {
+        const { sound: newSound } = await Audio.Sound.createAsync(
+          { uri: voiceUri },
+          { shouldPlay: true, isLooping: false }
+        );
+        setSound(newSound);
+        setIsPlaying(true);
+        newSound.setOnPlaybackStatusUpdate(async (status: any) => {
+          if (status.didJustFinish) {
+            setIsPlaying(false);
+            await newSound.unloadAsync();
+            setSound(null);
+          }
+        });
+      }
+    } catch (err) {
+      console.error('Playback error', err);
+    }
+  };
+
+  const deleteVoiceNote = async () => {
+    if (sound) await sound.unloadAsync();
+    setSound(null);
+    setVoiceUri(null);
+    setIsPlaying(false);
+  };
+
+  const submitReport = async () => {
+    const isContentEmpty = !textInput.trim() && selectedImages.length === 0 && selectedVideos.length === 0 && !voiceUri;
+    if (isContentEmpty && !selectedType) {
+      return showToast({ type: 'warning', title: 'Add Content', message: 'Please add a title, description, or media before submitting' });
     }
     const token = await SecureStore.getItemAsync('token');
     if (!token) return showToast({ type: 'error', title: 'Not Logged In', message: 'Please login to submit a report' });
     setIsSubmitting(true);
 
     const safeLocation = location || (lat ? `${lat.toFixed(4)}, ${lon?.toFixed(4)}` : 'Unknown location');
+    const defaultTitle = selectedType ? `${selectedType} Reported` : `Reported at ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+
     const reportData: ReportRequest = {
-      user, location: safeLocation, lat: lat ?? 0, lon: lon ?? 0,
-      title: titleInput.trim(),
+      user,
+      location: safeLocation,
+      lat: lat ?? 0,
+      lon: lon ?? 0,
+      title: titleInput.trim() || defaultTitle,
       description: textInput || 'No description',
-      imageUris: selectedImages, videoUris: selectedVideos,
+      imageUris: selectedImages,
+      videoUris: selectedVideos,
+      voiceUri: voiceUri || undefined,
       dateTime: new Date().toISOString(),
     };
 
     try {
       await reportService.submitReport(reportData);
-      setTextInput(''); setTitleInput(''); setSelectedImages([]); setSelectedVideos([]); setSelectedType('');
+      // Clear all state after successful submission
+      setTextInput('');
+      setTitleInput('');
+      setSelectedImages([]);
+      setSelectedVideos([]);
+      setSelectedType('');
+      deleteVoiceNote(); // Also clear audio recordings
+
       showToast({ type: 'success', title: 'Submitted!', message: 'Your report has been sent successfully' });
     } catch (err: any) {
       showToast({ type: 'error', title: 'Error', message: err.msg || 'Failed to submit report' });
@@ -177,7 +289,16 @@ export default function ReportScreen({ navigation }: any) {
               <TouchableOpacity
                 key={t.label}
                 style={[styles.typePill, { backgroundColor: G.card, borderColor: G.border }, selectedType === t.label && { backgroundColor: t.color, borderColor: t.color }]}
-                onPress={() => setSelectedType(selectedType === t.label ? '' : t.label)}
+                onPress={() => {
+                  const isDeselect = selectedType === t.label;
+                  setSelectedType(isDeselect ? '' : t.label);
+
+                  // Auto-update title if it's empty or was a previous default title
+                  const isDefaultTitle = incidentTypes.some(it => titleInput === `${it.label} Reported`);
+                  if (!isDeselect && (!titleInput || isDefaultTitle)) {
+                    setTitleInput(`${t.label} Reported`);
+                  }
+                }}
               >
                 <Ionicons name={t.icon as any} size={14} color={selectedType === t.label ? '#fff' : G.sub} />
                 <Text style={[styles.typePillText, { color: G.sub }, selectedType === t.label && { color: '#fff' }]}>{t.label}</Text>
@@ -186,9 +307,11 @@ export default function ReportScreen({ navigation }: any) {
           </ScrollView>
         </View>
 
-        {/* ─── Description ─── */}
         <View style={styles.section}>
-          <Text style={[styles.sectionLabel, { color: G.text }]}>Incident Details</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            <Text style={[styles.sectionLabel, { color: G.text, marginBottom: 0 }]}>Incident Details</Text>
+          </View>
+
           <TextInput
             style={[styles.descInput, { minHeight: 50, marginBottom: 12, backgroundColor: G.card, borderColor: G.border, color: G.text }]}
             placeholder="Title (e.g. Heavy Traffic at Main St)"
@@ -196,16 +319,19 @@ export default function ReportScreen({ navigation }: any) {
             value={titleInput}
             onChangeText={setTitleInput}
           />
-          <TextInput
-            style={[styles.descInput, { backgroundColor: G.card, borderColor: G.border, color: G.text }]}
-            placeholder="Describe what happened..."
-            placeholderTextColor={G.sub}
-            value={textInput}
-            onChangeText={setTextInput}
-            multiline
-            textAlignVertical="top"
-            numberOfLines={5}
-          />
+
+          <View style={{ position: 'relative' }}>
+            <TextInput
+              style={[styles.descInput, { backgroundColor: G.card, borderColor: G.border, color: G.text }]}
+              placeholder="Describe what happened..."
+              placeholderTextColor={G.sub}
+              value={textInput}
+              onChangeText={setTextInput}
+              multiline
+              textAlignVertical="top"
+              numberOfLines={5}
+            />
+          </View>
         </View>
 
         {/* ─── Media Upload ─── */}
@@ -236,7 +362,43 @@ export default function ReportScreen({ navigation }: any) {
                 </View>
               )}
             </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.mediaBtn,
+                { backgroundColor: G.card, borderColor: isRecordingVoice ? G.red : G.border }
+              ]}
+              onPress={() => isRecordingVoice ? stopRecording() : startRecording()}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.mediaBtnIcon, { backgroundColor: isRecordingVoice ? '#FEE2E2' : (isDark ? '#1F2937' : '#F3F4F6') }]}>
+                <Ionicons name={isRecordingVoice ? "stop" : "mic"} size={22} color={isRecordingVoice ? G.red : G.sub} />
+              </View>
+              <Text style={[styles.mediaBtnLabel, { color: isRecordingVoice ? G.red : G.sub }]}>
+                {isRecordingVoice ? `${recordTime}s` : "Voice"}
+              </Text>
+              {voiceUri && (
+                <View style={[styles.mediaBadge, { backgroundColor: G.red }]}>
+                  <Ionicons name="checkmark" size={12} color="#fff" />
+                </View>
+              )}
+            </TouchableOpacity>
           </View>
+
+          {/* Voice Note Player */}
+          {voiceUri && (
+            <View style={[styles.voicePlayer, { backgroundColor: G.card, borderColor: G.border }]}>
+              <TouchableOpacity onPress={playVoiceNote} style={[styles.playBtn, { backgroundColor: G.midGreen }]}>
+                <Ionicons name={isPlaying ? "pause" : "play"} size={20} color="#fff" />
+              </TouchableOpacity>
+              <View style={{ flex: 1, height: 4, backgroundColor: G.border, borderRadius: 2, marginHorizontal: 15 }}>
+                <View style={{ width: isPlaying ? '60%' : '0%', height: '100%', backgroundColor: G.midGreen, borderRadius: 2 }} />
+              </View>
+              <TouchableOpacity onPress={deleteVoiceNote} style={styles.deleteVoiceBtn}>
+                <Ionicons name="trash-outline" size={20} color={G.red} />
+              </TouchableOpacity>
+            </View>
+          )}
 
           {selectedImages.length > 0 && (
             <FlatList
@@ -294,13 +456,21 @@ export default function ReportScreen({ navigation }: any) {
         <View style={{ flex: 1 }}>
           <MapView
             style={{ flex: 1 }}
+            showsTraffic={true}
             initialRegion={{
               latitude: mapCoords?.lat || 24.8607,
               longitude: mapCoords?.lon || 67.0011,
-              latitudeDelta: 0.05, longitudeDelta: 0.05,
+              latitudeDelta: 0.1, longitudeDelta: 0.1,
             }}
           >
             {mapCoords && <Marker coordinate={{ latitude: mapCoords.lat, longitude: mapCoords.lon }} title="Reported Location" />}
+
+            {/* Shared Disaster & Landslide Layers */}
+            <DisasterMapLayers
+              disasters={disasters}
+              landslideHistory={landslideHistory}
+              showLandslideHistory={true}
+            />
           </MapView>
           <TouchableOpacity style={[styles.closeMapBtn, { backgroundColor: G.darkGreen }]} onPress={() => setMapVisible(false)}>
             <Text style={styles.closeMapText}>✖  Close Map</Text>
@@ -400,5 +570,44 @@ const styles = StyleSheet.create({
       ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8 },
       android: { elevation: 2 },
     }),
+  },
+  sttBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  sttBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  transcribingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 12,
+    zIndex: 10,
+  },
+  voicePlayer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 15,
+    borderWidth: 1,
+    marginTop: 10,
+  },
+  playBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  deleteVoiceBtn: {
+    padding: 8,
   },
 });

@@ -34,6 +34,29 @@ export const getWeather = async (lat: number, lon: number): Promise<WeatherData>
 };
 
 /**
+ * Get weather forecast (5 day / 3 hour)
+ */
+export const getForecast = async (lat: number, lon: number): Promise<any> => {
+    try {
+        const response = await externalApiClient.get(
+            'https://api.openweathermap.org/data/2.5/forecast',
+            {
+                params: {
+                    lat,
+                    lon,
+                    units: 'metric',
+                    appid: OPENWEATHER_KEY,
+                },
+            }
+        );
+        return response.data;
+    } catch (error: any) {
+        console.log('Forecast error:', error.response?.data || error.message);
+        return { list: [] };
+    }
+};
+
+/**
  * Reverse geocode coordinates to get location name
  */
 export const reverseGeocode = async (lat: number, lon: number): Promise<LocationInfo> => {
@@ -73,7 +96,7 @@ export const searchCities = async (query: string): Promise<CitySearchResult[]> =
                     key: LOCATIONIQ_KEY,
                     q: query,
                     format: 'json',
-                    limit: 5,
+                    limit: 7,
                 },
             }
         );
