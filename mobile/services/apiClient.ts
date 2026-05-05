@@ -27,10 +27,10 @@ if (__DEV__) {
     console.log('📦 API Base URL (APK mode):', API_BASE_URL);
 }
 
-// External API keys
-export const GOOGLE_API_KEY = 'AIzaSyA9WotEPNh6PRm_rIR6x_OO7lCyfsF0uoI';
-export const OPENWEATHER_KEY = '18a94d9824f517052eae3c6d408213ea';
-export const LOCATIONIQ_KEY = 'pk.373eb4eed9c850538051f7b1c58f4457';
+// External API keys — read from environment (set in .env)
+export const GOOGLE_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_API_KEY ?? '';
+export const OPENWEATHER_KEY = process.env.EXPO_PUBLIC_OPENWEATHER_KEY ?? '';
+export const LOCATIONIQ_KEY = process.env.EXPO_PUBLIC_LOCATIONIQ_KEY ?? '';
 
 // Create axios instance for backend API
 const apiClient = axios.create({

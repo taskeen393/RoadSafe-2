@@ -17,7 +17,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
+import MapView, { Marker } from '../../components/Map';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { reportService } from '../../services';

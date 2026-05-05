@@ -57,7 +57,7 @@ const DARK = {
     statusBar: 'light-content' as const,
 };
 
-export type ThemeColors = typeof LIGHT;
+export type ThemeColors = typeof LIGHT | typeof DARK;
 
 // ─── Context ───────────────────────────────────────────────
 interface ThemeContextValue {

@@ -1,4 +1,4 @@
-import Report from '../models/Report1.js';
+import Report from '../models/Report.js';
 import { initCloudinary } from '../config/cloudinary.js';
 
 /**

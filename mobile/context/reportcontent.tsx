@@ -42,13 +42,6 @@ const ReportProvider: React.FC<{ children: React.ReactNode }> = ({ children }) =
 
   useEffect(() => {
     refreshReports();
-
-    // Optional: auto-refresh every 15s
-    const interval = setInterval(() => {
-      refreshReports();
-    }, 15000);
-
-    return () => clearInterval(interval);
   }, []);
 
   return (

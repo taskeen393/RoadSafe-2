@@ -21,7 +21,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import MapView, { MapPressEvent, Marker, Heatmap } from "react-native-maps";
+import MapView, { MapPressEvent, Marker, Heatmap } from "../../components/Map";
 import { useToast } from "../../components/ToastContext";
 import { useTheme } from "../../context/ThemeContext";
 

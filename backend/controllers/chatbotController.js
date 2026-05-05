@@ -9,7 +9,7 @@
  */
 
 import Chat from '../models/Chat.js';
-import { generateRoadSafetyResponse } from '../services/gemini.service.js';
+import { generateRoadSafetyResponse } from '../services/chatbot.service.js';
 import { checkProfanity, getProfanityResponse } from '../utils/profanityFilter.js';
 import { logChatInteraction } from '../utils/logger.js';
 

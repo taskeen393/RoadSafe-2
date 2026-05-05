@@ -18,7 +18,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import MapView, { Marker, Polyline, Heatmap } from "react-native-maps";
+import MapView, { Marker, Polyline, Heatmap } from "../../components/Map";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useToast } from "../../components/ToastContext";
 import { useTheme } from '../../context/ThemeContext';

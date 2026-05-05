@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, Platform } from 'react-native';
-import { Marker, Heatmap } from 'react-native-maps';
+import { Marker, Heatmap } from './Map';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { DisasterAlert, LandslideEvent } from '../services/types';
 

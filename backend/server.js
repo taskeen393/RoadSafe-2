@@ -10,6 +10,7 @@ import authRoutes from './routes/auth.js';
 import chatbotRoute from './routes/chatbot.js';
 import reportRoutes from './routes/report.js';
 import trackRoute from './routes/track.js';
+import transcribeRoute from './routes/transcribe.js';
 import userRoutes from './routes/user.js';
 
 dotenv.config();
@@ -60,6 +61,7 @@ app.use('/api/report', reportRoutes);
 app.use('/api/chatbot', chatbotRoute);
 app.use('/api/sos', trackRoute);
 app.use('/api/user', userRoutes);
+app.use('/api/transcribe', transcribeRoute);
 
 // Root route
 app.get('/', (req, res) => {
@@ -69,8 +71,17 @@ app.get('/', (req, res) => {
 // Error handling middleware (must be after routes)
 app.use((err, req, res, next) => {
   console.error('❌ Server Error:', err.message);
-  console.error('Stack:', err.stack);
-  res.status(500).json({ message: err.message || 'Internal server error' });
+  if (process.env.NODE_ENV !== 'production') {
+    console.error('Stack:', err.stack);
+  }
+
+  const status = err.status || err.statusCode || 500;
+  res.status(status).json({
+    success: false,
+    message: process.env.NODE_ENV === 'production'
+      ? 'Internal server error'
+      : err.message || 'Internal server error',
+  });
 });
 
 // Start server - listen on 0.0.0.0 to accept connections from other devices on the network

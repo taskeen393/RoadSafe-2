@@ -18,7 +18,7 @@ backend/
 ├── routes/
 │   └── chatbot.js             # POST /api/chatbot (validated + rate-limited)
 ├── services/
-│   └── gemini.service.js      # Core AI logic (system prompt, guardrails, emergency)
+│   └── chatbot.service.js     # Core AI logic (system prompt, guardrails, emergency)
 ├── utils/
 │   ├── logger.js              # Safe logging (no sensitive data)
 │   └── profanityFilter.js     # Basic profanity word filter

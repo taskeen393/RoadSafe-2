@@ -18,7 +18,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import MapView, { Marker, Heatmap } from 'react-native-maps';
+import MapView, { Marker, Heatmap } from '../../components/Map';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { reportService } from '../../services';
 import { ReportRequest } from '../../services/types';
@@ -62,10 +62,10 @@ export default function ReportScreen({ navigation }: any) {
 
   // Incident type selection
   const incidentTypes = [
-    { label: 'Accident', icon: 'car-crash', color: '#E95B5B' },
+    { label: 'Accident', icon: 'car', color: '#E95B5B' },
     { label: 'Flood', icon: 'water', color: '#3B9EE8' },
-    { label: 'Landslide', icon: 'terrain', color: '#8B5CF6' },
-    { label: 'Roadblock', icon: 'barrier', color: '#F59E0B' },
+    { label: 'Landslide', icon: 'earth', color: '#8B5CF6' },
+    { label: 'Roadblock', icon: 'construct', color: '#F59E0B' },
     { label: 'Other', icon: 'alert-circle-outline', color: '#6B7280' },
   ];
   const [selectedType, setSelectedType] = useState('');

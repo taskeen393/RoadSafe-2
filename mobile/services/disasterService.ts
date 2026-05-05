@@ -8,7 +8,7 @@ import { DisasterAlert } from './types';
  * using the GDACS GeoJSON feed.
  */
 
-const GDACS_URL = 'https://www.gdacs.org/gdacsapi/api/polygons/getgeojson?eventtype=EQ,FL,TC&period=7';
+const GDACS_URL = 'https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH?eventlist=EQ;FL;TC';
 
 /**
  * Get Disaster Alerts (Filtered for Pakistan region)
@@ -24,21 +24,22 @@ export const getDisasterAlerts = async (): Promise<DisasterAlert[]> => {
         return response.data.features
             .filter((f: any) => {
                 const props = f.properties || {};
-                const countries = props.countries || [];
+                const affectedCountries = props.affectedcountries || [];
                 
-                // Safety check for toUpperCase on potential undefined/null
+                // Check if Pakistan is in affected countries or iso3 matches
                 return (
                     (props.iso3 === 'PAK') ||
                     (props.name && props.name.toUpperCase().includes(searchName.toUpperCase())) ||
-                    countries.some((c: any) => 
+                    affectedCountries.some((c: any) => 
                         (c.iso3 === 'PAK') || 
-                        (c.name && c.name.toUpperCase() === searchName.toUpperCase())
+                        (c.countryname && c.countryname.toUpperCase() === searchName.toUpperCase())
                     )
                 );
             })
             .map((f: any) => {
                 const props = f.properties || {};
-                const [lon, lat] = f.geometry.coordinates;
+                const geometry = f.geometry || {};
+                const [lon, lat] = geometry.coordinates || [0, 0];
 
                 return {
                     id: f.id || Math.random().toString(36).substr(2, 9),

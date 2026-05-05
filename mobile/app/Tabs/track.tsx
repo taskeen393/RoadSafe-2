@@ -9,7 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import MapView, { Marker, Heatmap } from 'react-native-maps';
+import MapView, { Marker, Heatmap } from '../../components/Map';
 import { useToast } from '../../components/ToastContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useDisasterData } from '../hooks/useDisasterData';
