@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "AMT",
-    "slug": "AMT",
+    "slug": "road-safe",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/logo-shield.png",
@@ -56,9 +56,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "143d4939-1fbd-43ca-94c9-1cbaba091b0a"
+        "projectId": "3b69bdfd-5d65-4333-bb76-04b5e1b61088"
       }
     },
-    "owner": "taskeen_393"
+    "owner": "moinuddin2004"
   }
 }
